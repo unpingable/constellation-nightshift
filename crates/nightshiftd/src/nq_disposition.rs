@@ -415,6 +415,11 @@ pub fn qualify_current_purpose(
     }
     let dto = NqRelianceReceiptDto::parse_for_request(bytes, expected_request, observed_at)
         .map_err(|e| e.to_string())?;
+    if dto.claim != "docket_attempt_settled" {
+        return Err(
+            "historical generic claim cannot satisfy the Docket current-role allowlist".into(),
+        );
+    }
     if dto.purpose != "historical_readonly"
         || !matches!(
             dto.consumer_profile_id.as_str(),
@@ -539,6 +544,175 @@ pub fn qualify_current_purpose(
 }
 
 /// Limits stamped on every record, whatever the disposition.
+/// Consume the bounded NQ Docket factual family without reconstructing Docket
+/// settlement. The configured NQ producer remains the source owner.
+pub fn qualify_docket_current_purpose(
+    bytes: &[u8],
+    expected_request: &serde_json::Value,
+    observed_at: &str,
+    cycle_id: &str,
+    nonce: &str,
+    expected_authority: &str,
+    port: &mut dyn crate::currentness::PresentEvidencePortV1,
+) -> std::result::Result<CurrentPurposeDisposition, String> {
+    use crate::currentness::{PresentEvidenceQueryV1, SupportStandingV1};
+    use sha2::{Digest, Sha256};
+    let digest = |v: &serde_json::Value| -> Result<String, String> {
+        Ok(format!(
+            "sha256:{:x}",
+            Sha256::digest(serde_jcs::to_vec(v).map_err(|e| e.to_string())?)
+        ))
+    };
+    let mut v: serde_json::Value = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+    // Actual NQ renderer is canonical; this also excludes duplicate-key inputs.
+    if serde_jcs::to_vec(&v).map_err(|e| e.to_string())? != bytes {
+        return Err("NQ Docket receipt is not exact canonical JSON".into());
+    }
+    let identity = v
+        .as_object_mut()
+        .ok_or("receipt not object")?
+        .remove("receipt_id")
+        .ok_or("receipt identity missing")?;
+    if identity != digest(&v)?
+        || v["schema"] != "nq.docket-purpose-support/v1"
+        || v["request"] != *expected_request
+        || v["request_digest"] != digest(expected_request)?
+        || v["claim"] != "docket_attempt_settled"
+        || expected_authority.trim().is_empty()
+    {
+        return Err("NQ Docket receipt/request/claim binding mismatch".into());
+    }
+    let purpose = expected_request["purpose"]
+        .as_str()
+        .ok_or("purpose absent")?;
+    if ![
+        "continue_observing",
+        "wait",
+        "request_evidence",
+        "stop",
+        "human_escalation",
+    ]
+    .contains(&purpose)
+    {
+        return Err("unsupported read-only purpose".into());
+    }
+    let at = chrono::DateTime::parse_from_rfc3339(observed_at).map_err(|e| e.to_string())?;
+    let generated =
+        chrono::DateTime::parse_from_rfc3339(v["generated_at"].as_str().ok_or("time absent")?)
+            .map_err(|e| e.to_string())?;
+    let expires =
+        chrono::DateTime::parse_from_rfc3339(v["expires_at"].as_str().ok_or("expiry absent")?)
+            .map_err(|e| e.to_string())?;
+    if at < generated || at >= expires {
+        return Err("NQ Docket evidence time outside exact interval".into());
+    }
+    let subject = v["subject"].as_str().ok_or("subject missing")?;
+    if expected_request["subject"] != subject {
+        return Err("subject mismatch".into());
+    }
+    let id = identity.as_str().ok_or("identity malformed")?.to_owned();
+    let mut ids = vec![
+        id.clone(),
+        v["source_digest"]
+            .as_str()
+            .ok_or("source digest missing")?
+            .into(),
+    ];
+    for support in v["supporting_receipts"]
+        .as_array()
+        .ok_or("supporting array missing")?
+    {
+        ids.push(
+            support["content_hash"]
+                .as_str()
+                .ok_or("support identity missing")?
+                .into(),
+        );
+    }
+    ids.sort();
+    if ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err("self or duplicate support".into());
+    }
+    let query = PresentEvidenceQueryV1 {
+        schema: String::new(),
+        query_id: String::new(),
+        observation_cycle_id: cycle_id.into(),
+        request_nonce: nonce.into(),
+        observation_id: digest(
+            &serde_json::json!({"nq_receipt":id,"purpose":purpose,"authority":expected_authority}),
+        )?,
+        diagnostic_inputs_id: digest(
+            &serde_json::json!({"schema":"nightshift.docket-purpose-inputs/v1","artifacts":ids}),
+        )?,
+        subject_id: subject.into(),
+        scope_id: v["subject_digest"]
+            .as_str()
+            .ok_or("subject digest absent")?
+            .into(),
+        artifact_ids: ids,
+    }
+    .seal()?;
+    let mut result = CurrentPurposeDisposition {
+        schema: "nightshift.current-purpose-disposition/v1".into(),
+        purpose: purpose.into(),
+        nq_decision_id: id,
+        query: query.clone(),
+        support: None,
+        disposition: Disposition::EvidenceUnavailable,
+        reason: String::new(),
+        does_not_establish: vec![
+            "no action authorized or executed".into(),
+            "Docket testimony, NQ factual policy and currentness retain distinct owners".into(),
+        ],
+    };
+    if v["decision"] != "supported_readonly" {
+        result.disposition = match v["decision"].as_str() {
+            Some("contradiction_retained") => Disposition::HumanJudgmentRequired,
+            Some("stale_evidence") => Disposition::WaitForFreshEvidence,
+            Some(
+                "supporting_evidence_missing"
+                | "supporting_evidence_not_current_or_verified"
+                | "residual_obligations_unresolved",
+            ) => Disposition::RequestAdditionalEvidence,
+            Some("claim_not_verified") => Disposition::EvidenceUnavailable,
+            _ => Disposition::Stop,
+        };
+        result.reason = format!(
+            "NQ factual decision {}; present evidence cannot repair it",
+            v["decision"]
+        );
+        return Ok(result);
+    }
+    match port.resolve(&query) {
+        Err(reason) => result.reason = format!("present evidence unavailable: {reason}"),
+        Ok(support) => {
+            support.validate_for(&query)?;
+            if support.authority_id != expected_authority {
+                return Err("wrong present-evidence authority".into());
+            }
+            result.disposition = match support.standing {
+                SupportStandingV1::Current if !support.evidence_refs.is_empty() => match purpose {
+                    "wait" => Disposition::WaitForFreshEvidence,
+                    "request_evidence" => Disposition::RequestAdditionalEvidence,
+                    "stop" => Disposition::Stop,
+                    "human_escalation" => Disposition::HumanJudgmentRequired,
+                    _ => Disposition::ContinueObserving,
+                },
+                SupportStandingV1::Current => return Err("current support lacks evidence".into()),
+                SupportStandingV1::Expired => Disposition::WaitForFreshEvidence,
+                SupportStandingV1::Contradictory => Disposition::HumanJudgmentRequired,
+                _ => Disposition::EvidenceUnavailable,
+            };
+            result.reason = format!(
+                "qualified present evidence {:?}; read-only posture only",
+                support.standing
+            );
+            result.support = Some(support);
+        }
+    }
+    Ok(result)
+}
+
 fn mandatory_does_not_establish() -> Vec<String> {
     vec![
         "no action was executed or authorized by this disposition".to_string(),

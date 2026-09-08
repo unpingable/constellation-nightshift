@@ -58,6 +58,91 @@ impl nightshiftd::currentness::PresentEvidencePortV1 for PresentFixture {
 }
 
 #[test]
+#[ignore = "requires NQ_DOCKET_OUTPUT from actual native Docket acquisition"]
+fn native_docket_policy_and_currentness_composition() {
+    use nightshiftd::nq_disposition::qualify_docket_current_purpose;
+    let root = std::path::PathBuf::from(std::env::var("NQ_DOCKET_OUTPUT").unwrap());
+    for (name, expected) in [
+        ("committed", Disposition::ContinueObserving),
+        ("continuity", Disposition::ContinueObserving),
+        ("prepared", Disposition::EvidenceUnavailable),
+        ("refused", Disposition::EvidenceUnavailable),
+        ("indeterminate", Disposition::EvidenceUnavailable),
+        ("wait", Disposition::WaitForFreshEvidence),
+        ("request_evidence", Disposition::RequestAdditionalEvidence),
+        ("stop", Disposition::Stop),
+        ("human_escalation", Disposition::HumanJudgmentRequired),
+        (
+            "residual_obligations_unresolved",
+            Disposition::RequestAdditionalEvidence,
+        ),
+        ("contradiction_retained", Disposition::HumanJudgmentRequired),
+    ] {
+        let bytes = std::fs::read(root.join(format!("{name}.json"))).unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let run = |mode| {
+            qualify_docket_current_purpose(
+                &bytes,
+                &v["request"],
+                v["generated_at"].as_str().unwrap(),
+                "docket-cycle",
+                "docket-nonce",
+                "qualified-fixture-source",
+                &mut PresentFixture(mode),
+            )
+        };
+        let result = run("current").unwrap();
+        assert_eq!(result.disposition, expected, "{name}");
+        assert!(result
+            .does_not_establish
+            .iter()
+            .any(|s| s.contains("no action")));
+        if ["committed", "continuity"].contains(&name) {
+            assert_eq!(
+                result.query.artifact_ids.len(),
+                if name == "continuity" { 3 } else { 2 }
+            );
+            assert_eq!(
+                run("absent").unwrap().disposition,
+                Disposition::EvidenceUnavailable
+            );
+            assert_eq!(
+                run("unknown").unwrap().disposition,
+                Disposition::EvidenceUnavailable
+            );
+            assert_eq!(
+                run("expired").unwrap().disposition,
+                Disposition::WaitForFreshEvidence
+            );
+            assert!(run("wrong-subject").is_err());
+            assert!(run("wrong-authority").is_err());
+            let mut wrong = v["request"].clone();
+            wrong["purpose"] = serde_json::json!("execute");
+            assert!(qualify_docket_current_purpose(
+                &bytes,
+                &wrong,
+                v["generated_at"].as_str().unwrap(),
+                "c",
+                "n",
+                "qualified-fixture-source",
+                &mut PresentFixture("current")
+            )
+            .is_err());
+            assert!(qualify_docket_current_purpose(
+                &bytes,
+                &v["request"],
+                v["expires_at"].as_str().unwrap(),
+                "c",
+                "n",
+                "qualified-fixture-source",
+                &mut PresentFixture("current")
+            )
+            .is_err());
+        }
+    }
+}
+
+#[test]
 #[ignore = "requires NQ_PURPOSE_FIXTURE_OUTPUT from native locally qualified store test"]
 fn native_purpose_composes_existing_qualified_currentness_port() {
     use nightshiftd::diagnostic_posture::DiagnosticInputs;
@@ -82,38 +167,18 @@ fn native_purpose_composes_existing_qualified_currentness_port() {
                 &mut PresentFixture(mode),
             )
         };
-        let supported = run("current", "continue_observing").unwrap();
-        assert_eq!(
-            supported.query.artifact_ids.len(),
-            if filename == "continuity-support.json" {
-                2
-            } else {
-                1
-            }
-        );
-        assert_eq!(supported.disposition, Disposition::ContinueObserving);
-        assert_eq!(
-            supported.support.unwrap().authority_id,
-            "qualified-fixture-source"
-        );
-        assert!(supported
-            .does_not_establish
-            .iter()
-            .any(|s| s.contains("no action")));
-        assert_eq!(
-            run("absent", "continue_observing").unwrap().disposition,
-            Disposition::EvidenceUnavailable
-        );
-        assert_eq!(
-            run("unknown", "continue_observing").unwrap().disposition,
-            Disposition::EvidenceUnavailable
-        );
-        assert_eq!(
-            run("expired", "continue_observing").unwrap().disposition,
-            Disposition::WaitForFreshEvidence
-        );
-        assert!(run("wrong-subject", "continue_observing").is_err());
-        assert!(run("wrong-authority", "continue_observing").is_err());
+        for mode in [
+            "current",
+            "absent",
+            "unknown",
+            "expired",
+            "wrong-subject",
+            "wrong-authority",
+        ] {
+            assert!(run(mode, "continue_observing")
+                .unwrap_err()
+                .contains("allowlist"));
+        }
         assert!(run("current", "execute").is_err());
     }
 }
