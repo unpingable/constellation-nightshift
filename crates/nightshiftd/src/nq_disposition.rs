@@ -1,6 +1,6 @@
 //! Read-only dispositions derived from NQ reliance testimony.
 //!
-//! Night Shift consumes `nq.reliance.receipt.v1` exactly as NQ emits it and
+//! Night Shift consumes native `nq.diagnostic-purpose-support/v1` and
 //! proposes a **posture**. It does not re-evaluate evidence, resolve
 //! contradictions, discharge obligations, retry, repair, or execute anything.
 //!
@@ -24,7 +24,9 @@ use serde::{Deserialize, Serialize};
 use crate::errors::{NightShiftError, NqContractViolationKind, Result};
 
 /// The reliance receipt schema this consumer speaks.
-pub const NQ_RELIANCE_RECEIPT_SCHEMA: &str = "nq.reliance.receipt.v1";
+pub const NQ_RELIANCE_RECEIPT_SCHEMA: &str = "nq.diagnostic-purpose-support/v1";
+/// Archived donor wire; never selected as a fallback by the current parser.
+pub const HISTORICAL_NQ_RELIANCE_RECEIPT_SCHEMA: &str = "nq.reliance.receipt.v1";
 
 /// The consumer profile Night Shift is configured to be by default.
 ///
@@ -48,7 +50,8 @@ pub struct SupportingReceiptRefDto {
     pub subject: String,
 }
 
-/// One `nq.reliance.receipt.v1`, deserialize-only.
+/// Native purpose-support projection, deserialize-only. Archived classic
+/// receipts are accessible only through the explicitly historical parser.
 ///
 /// Unknown fields are ignored so NQ can add non-breaking detail; every field
 /// Night Shift acts on is required and load-bearing.
@@ -102,12 +105,87 @@ impl NqRelianceReceiptDto {
     /// bytes, an unexpected consumer profile, a missing binding disclosure, or
     /// a supporting disclosure with no identity.
     pub fn parse_checked(bytes: &[u8], expected_profile: &str) -> Result<Self> {
+        Self::parse_schema(bytes, expected_profile, NQ_RELIANCE_RECEIPT_SCHEMA)
+    }
+
+    /// Explicit archive inspection only. This does not qualify a modern
+    /// producer or permit current-mode fallback.
+    pub fn parse_historical_checked(bytes: &[u8], expected_profile: &str) -> Result<Self> {
+        Self::parse_schema(
+            bytes,
+            expected_profile,
+            HISTORICAL_NQ_RELIANCE_RECEIPT_SCHEMA,
+        )
+    }
+
+    /// Current ingestion requires the exact requested consumer/purpose/subject/
+    /// claim/time scope, and checks receipt expiry separately from liveness.
+    /// Bytes must come from the operator-configured NQ source; hashes are
+    /// integrity bindings, not authentication of an arbitrary file.
+    pub fn parse_for_request(
+        bytes: &[u8],
+        expected_request: &serde_json::Value,
+        observed_at: &str,
+    ) -> Result<Self> {
+        let violation = |detail: String| NightShiftError::NqContractViolation {
+            kind: NqContractViolationKind::MalformedField,
+            detail,
+        };
+        let value: serde_json::Value =
+            serde_json::from_slice(bytes).map_err(|e| violation(e.to_string()))?;
+        let profile = expected_request["consumer"]
+            .as_str()
+            .ok_or_else(|| violation("expected consumer missing".into()))?;
+        let dto = Self::parse_checked(bytes, profile)?;
+        if value["request"] != *expected_request
+            || value["purpose"] != expected_request["purpose"]
+            || value["claim"] != expected_request["claim"]
+            || value["subject_digest"] != expected_request["subject_digest"]
+        {
+            return Err(violation("purpose request binding mismatch".into()));
+        }
+        use sha2::{Digest, Sha256};
+        let request_hash = format!(
+            "sha256:{:x}",
+            Sha256::digest(
+                serde_jcs::to_vec(expected_request).map_err(|e| violation(e.to_string()))?
+            )
+        );
+        let mut preimage = value.clone();
+        preimage
+            .as_object_mut()
+            .ok_or_else(|| violation("receipt object".into()))?
+            .remove("decision_id");
+        let receipt_hash = format!(
+            "sha256:{:x}",
+            Sha256::digest(serde_jcs::to_vec(&preimage).map_err(|e| violation(e.to_string()))?)
+        );
+        if dto.request_digest != request_hash || dto.decision_id != receipt_hash {
+            return Err(violation("purpose receipt digest mismatch".into()));
+        }
+        let now = chrono::DateTime::parse_from_rfc3339(observed_at)
+            .map_err(|e| violation(e.to_string()))?;
+        let generated = chrono::DateTime::parse_from_rfc3339(&dto.generated_at)
+            .map_err(|e| violation(e.to_string()))?;
+        let expires = chrono::DateTime::parse_from_rfc3339(
+            value["expires_at"]
+                .as_str()
+                .ok_or_else(|| violation("expiry absent".into()))?,
+        )
+        .map_err(|e| violation(e.to_string()))?;
+        if now < generated || (dto.decision == "supported_readonly" && now >= expires) {
+            return Err(violation("purpose receipt future or expired".into()));
+        }
+        Ok(dto)
+    }
+
+    fn parse_schema(bytes: &[u8], expected_profile: &str, expected_schema: &str) -> Result<Self> {
         let dto: Self =
             serde_json::from_slice(bytes).map_err(|e| NightShiftError::NqContractViolation {
                 kind: NqContractViolationKind::MalformedField,
                 detail: format!("reliance receipt is not decodable: {e}"),
             })?;
-        if dto.schema != NQ_RELIANCE_RECEIPT_SCHEMA {
+        if dto.schema != expected_schema {
             return Err(NightShiftError::NqContractViolation {
                 kind: NqContractViolationKind::SchemaMismatch,
                 detail: format!(
@@ -372,7 +450,7 @@ pub fn derive_disposition(
                 );
             };
             match r.decision.as_str() {
-                "authorized_reliance" => {
+                "supported_readonly" | "authorized_reliance" => {
                     reasons.push(format!(
                         "NQ authorized reliance on {:?} for purpose {:?}",
                         r.claim, r.purpose
@@ -490,6 +568,7 @@ fn finish(
     let mut establishes = Vec::new();
 
     if let Some(r) = receipt {
+        does_not_establish.extend(r.does_not_establish.clone());
         // Carried facts survive the projection, whatever the disposition.
         if !r.unresolved_residuals.is_empty() {
             does_not_establish
@@ -506,11 +585,11 @@ fn finish(
         }
         does_not_establish.push(r.caller_binding_disclosure.clone());
         if disposition == Disposition::ContinueObserving {
-            establishes.push(format!(
-                "NQ authorized this consumer to rely on {:?} for {:?}; Night Shift may \
-                 continue read-only consideration",
-                r.claim, r.purpose
-            ));
+            establishes.push(if r.decision=="supported_readonly" {
+                format!("NQ supports only the explicit {:?} consideration of retained claim {:?}; source currentness is not inferred",r.purpose,r.claim)
+            } else {
+                format!("Historical NQ authorized this consumer to rely on {:?} for {:?}; Night Shift may continue read-only consideration",r.claim,r.purpose)
+            });
         }
     }
 
