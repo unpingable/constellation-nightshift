@@ -379,6 +379,131 @@ impl From<&NqRelianceReceiptDto> for SourceBinding {
 
 pub const DISPOSITION_SCHEMA: &str = "nightshift.readonly_disposition.v1";
 
+/// Native factual eligibility and authority-owned present support are separate
+/// axes. This record does not rewrite NQ's historical purpose receipt.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurrentPurposeDisposition {
+    pub schema: String,
+    pub purpose: String,
+    pub nq_decision_id: String,
+    pub query: crate::currentness::PresentEvidenceQueryV1,
+    pub support: Option<crate::currentness::QualifiedSupportV1>,
+    pub disposition: Disposition,
+    pub reason: String,
+    pub does_not_establish: Vec<String>,
+}
+
+/// Compose an exact native retained-claim eligibility result with the existing
+/// live present-evidence port. Only that port owns currentness. Neither an
+/// artifact timestamp nor a file containing an old support result is Fresh.
+#[allow(clippy::too_many_arguments)]
+pub fn qualify_current_purpose(
+    bytes: &[u8],
+    expected_request: &serde_json::Value,
+    observed_at: &str,
+    purpose: &str,
+    inputs: &crate::diagnostic_posture::DiagnosticInputs,
+    cycle_id: &str,
+    nonce: &str,
+    expected_authority: &str,
+    port: &mut dyn crate::currentness::PresentEvidencePortV1,
+) -> std::result::Result<CurrentPurposeDisposition, String> {
+    use crate::currentness::{delivered_artifact_ids, PresentEvidenceQueryV1, SupportStandingV1};
+    use sha2::{Digest, Sha256};
+    if purpose != "continue_observing" || expected_authority.trim().is_empty() {
+        return Err("unsupported current purpose or absent support authority".into());
+    }
+    let dto = NqRelianceReceiptDto::parse_for_request(bytes, expected_request, observed_at)
+        .map_err(|e| e.to_string())?;
+    if dto.purpose != "historical_readonly" || dto.consumer_profile_id != "nightshift-readonly" {
+        return Err("current composition requires explicit base historical eligibility; continuity prerequisites are not interchangeable".into());
+    }
+    inputs.validate()?;
+    let v: serde_json::Value = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+    let ids = delivered_artifact_ids(inputs);
+    if ids != vec![dto.receipt_content_hash.clone()] || inputs.inputs.len() != 1 {
+        return Err("purpose support requires exact single-artifact input basis".into());
+    }
+    let crate::diagnostic_posture::DiagnosticInputStatus::Delivered { artifact } =
+        &inputs.inputs[0].status
+    else {
+        return Err("purpose artifact not delivered".into());
+    };
+    if serde_json::to_value(artifact).map_err(|e| e.to_string())? != v["source_artifact"] {
+        return Err("purpose artifact bytes differ from qualified NQ source".into());
+    }
+    let subject = &v["source_artifact"]["subject"];
+    let observation_id=format!("sha256:{:x}",Sha256::digest(serde_jcs::to_vec(&serde_json::json!({"nq_decision_id":dto.decision_id,"purpose":purpose,"authority":expected_authority})).map_err(|e|e.to_string())?));
+    let query = PresentEvidenceQueryV1 {
+        schema: String::new(),
+        query_id: String::new(),
+        observation_cycle_id: cycle_id.into(),
+        request_nonce: nonce.into(),
+        observation_id,
+        diagnostic_inputs_id: inputs.inputs_id.clone(),
+        subject_id: subject["id"].as_str().ok_or("subject absent")?.into(),
+        scope_id: subject["scope"]["digest"]
+            .as_str()
+            .ok_or("scope absent")?
+            .into(),
+        artifact_ids: ids,
+    }
+    .seal()?;
+    let mut result = CurrentPurposeDisposition {
+        schema: "nightshift.current-purpose-disposition/v1".into(),
+        purpose: purpose.into(),
+        nq_decision_id: dto.decision_id.clone(),
+        query: query.clone(),
+        support: None,
+        disposition: Disposition::EvidenceUnavailable,
+        reason: String::new(),
+        does_not_establish: vec![
+            "no action authorized or executed".into(),
+            "NQ factual qualification and present evidence retain separate owners".into(),
+            "stored support is historical; only the exact live query response applies".into(),
+        ],
+    };
+    if dto.decision != "supported_readonly" {
+        result.disposition = derive_disposition(
+            &SourceState::Fresh,
+            Some(&dto),
+            observed_at,
+            &dto.consumer_profile_id,
+        )
+        .disposition;
+        result.reason =
+            "NQ did not establish factual eligibility; present support cannot repair that refusal"
+                .into();
+        return Ok(result);
+    }
+    match port.resolve(&query) {
+        Err(reason) => result.reason = format!("present evidence unavailable: {reason}"),
+        Ok(support) => {
+            support.validate_for(&query)?;
+            if support.authority_id != expected_authority {
+                return Err("present support source does not match configured authority".into());
+            }
+            result.disposition = match support.standing {
+                SupportStandingV1::Current if !support.evidence_refs.is_empty() => {
+                    Disposition::ContinueObserving
+                }
+                SupportStandingV1::Current => {
+                    return Err("current support lacks evidence references".into())
+                }
+                SupportStandingV1::Expired => Disposition::WaitForFreshEvidence,
+                SupportStandingV1::Contradictory => Disposition::HumanJudgmentRequired,
+                _ => Disposition::EvidenceUnavailable,
+            };
+            result.reason = format!(
+                "qualified present-evidence authority returned {:?}; no action authority",
+                support.standing
+            );
+            result.support = Some(support);
+        }
+    }
+    Ok(result)
+}
+
 /// Limits stamped on every record, whatever the disposition.
 fn mandatory_does_not_establish() -> Vec<String> {
     vec![

@@ -4,6 +4,110 @@ use nightshiftd::nq_disposition::{
     derive_disposition, Disposition, NqRelianceReceiptDto, SourceState,
 };
 
+/// Qualified-port boundary fixture, not a deployment claim about Pulse.
+struct PresentFixture(&'static str);
+impl nightshiftd::currentness::PresentEvidencePortV1 for PresentFixture {
+    fn resolve(
+        &mut self,
+        q: &nightshiftd::currentness::PresentEvidenceQueryV1,
+    ) -> Result<nightshiftd::currentness::QualifiedSupportV1, String> {
+        use nightshiftd::currentness::*;
+        if self.0 == "absent" {
+            return Err("no authority response".into());
+        }
+        let mut support = QualifiedSupportV1 {
+            schema: QUALIFIED_SUPPORT_SCHEMA_V1.into(),
+            support_id: String::new(),
+            authority_id: if self.0 == "wrong-authority" {
+                "different"
+            } else {
+                "qualified-fixture-source"
+            }
+            .into(),
+            query_id: q.query_id.clone(),
+            observation_cycle_id: q.observation_cycle_id.clone(),
+            request_nonce: q.request_nonce.clone(),
+            observation_id: q.observation_id.clone(),
+            diagnostic_inputs_id: q.diagnostic_inputs_id.clone(),
+            subject_id: if self.0 == "wrong-subject" {
+                "different".into()
+            } else {
+                q.subject_id.clone()
+            },
+            scope_id: q.scope_id.clone(),
+            artifact_ids: q.artifact_ids.clone(),
+            evaluated_at: SupportReceiverInstantV1 {
+                clock_id: "fixture-receiver".into(),
+                tick: 10,
+            },
+            expiry: Some(SupportExpiryV1 {
+                clock_id: "fixture-receiver".into(),
+                tick: if self.0 == "expired" { 10 } else { 11 },
+            }),
+            standing: match self.0 {
+                "expired" => SupportStandingV1::Expired,
+                "unknown" => SupportStandingV1::Unknown,
+                _ => SupportStandingV1::Current,
+            },
+            evidence_refs: q.artifact_ids.clone(),
+            contradiction_refs: vec![],
+        };
+        support.support_id = support.computed_support_id()?;
+        Ok(support)
+    }
+}
+
+#[test]
+#[ignore = "requires NQ_PURPOSE_FIXTURE_OUTPUT from native locally qualified store test"]
+fn native_purpose_composes_existing_qualified_currentness_port() {
+    use nightshiftd::diagnostic_posture::DiagnosticInputs;
+    use nightshiftd::nq_disposition::qualify_current_purpose;
+    let root = std::path::PathBuf::from(std::env::var("NQ_PURPOSE_FIXTURE_OUTPUT").unwrap());
+    let bytes = std::fs::read(root.join("historical-support.json")).unwrap();
+    let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let a = &v["source_artifact"];
+    let mut inputs:DiagnosticInputs=serde_json::from_value(serde_json::json!({"schema":"nightshift.diagnostic_inputs.v2","inputs_id":"","inputs":[{"key":{"question_id":a["question"]["id"],"subject_id":a["subject"]["id"],"profile_id":a["profile"]["id"],"vantage_id":a["vantage"]["id"]},"status":"delivered","artifact":a}]})).unwrap();
+    inputs.inputs_id = inputs.computed_inputs_id().unwrap();
+    let run = |mode, purpose| {
+        qualify_current_purpose(
+            &bytes,
+            &v["request"],
+            v["generated_at"].as_str().unwrap(),
+            purpose,
+            &inputs,
+            "purpose-cycle-1",
+            "purpose-nonce-1",
+            "qualified-fixture-source",
+            &mut PresentFixture(mode),
+        )
+    };
+    let supported = run("current", "continue_observing").unwrap();
+    assert_eq!(supported.disposition, Disposition::ContinueObserving);
+    assert_eq!(
+        supported.support.unwrap().authority_id,
+        "qualified-fixture-source"
+    );
+    assert!(supported
+        .does_not_establish
+        .iter()
+        .any(|s| s.contains("no action")));
+    assert_eq!(
+        run("absent", "continue_observing").unwrap().disposition,
+        Disposition::EvidenceUnavailable
+    );
+    assert_eq!(
+        run("unknown", "continue_observing").unwrap().disposition,
+        Disposition::EvidenceUnavailable
+    );
+    assert_eq!(
+        run("expired", "continue_observing").unwrap().disposition,
+        Disposition::WaitForFreshEvidence
+    );
+    assert!(run("wrong-subject", "continue_observing").is_err());
+    assert!(run("wrong-authority", "continue_observing").is_err());
+    assert!(run("current", "execute").is_err());
+}
+
 #[test]
 fn current_parser_rejects_classic_schema() {
     let bytes = include_bytes!("fixtures/nq_reliance/valid_operational_health_reliance.json");
