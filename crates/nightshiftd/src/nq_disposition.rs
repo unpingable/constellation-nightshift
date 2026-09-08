@@ -393,10 +393,7 @@ pub struct CurrentPurposeDisposition {
     pub does_not_establish: Vec<String>,
 }
 
-/// Compose an exact native retained-claim eligibility result with the existing
-/// live present-evidence port. Only that port owns currentness. Neither an
-/// artifact timestamp nor a file containing an old support result is Fresh.
-#[allow(clippy::too_many_arguments)]
+/// Check the source-owned context's complete wire shape, not its truth.
 fn require_snapshot_context(value: &serde_json::Value) -> Result<(), String> {
     let map = value
         .as_object()
@@ -421,6 +418,10 @@ fn require_snapshot_context(value: &serde_json::Value) -> Result<(), String> {
     Ok(())
 }
 
+/// Compose an exact native retained-claim eligibility result with the existing
+/// live present-evidence port. Only that port owns currentness. Neither an
+/// artifact timestamp nor a file containing an old support result is Fresh.
+#[allow(clippy::too_many_arguments)]
 pub fn qualify_current_purpose(
     bytes: &[u8],
     expected_request: &serde_json::Value,
