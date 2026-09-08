@@ -166,7 +166,7 @@ nightshift --store nightshift.sqlite attention ingest \
   --pulse-receipt pulse-receipt.json \
   --pulse-program /qualified/path/pulse-project-predicate-support \
   --pulse-support-policy pulse-policy.json \
-  --nq-executable /qualified/path/nq-monitor \
+  --nq-executable /qualified/path/nq \
   --nq-receipt nq-receipt.json \
   --inventory monitor-inventory.json \
   --catalog predicate-catalog.json \

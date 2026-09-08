@@ -1,3 +1,7 @@
+# HISTORICAL WATCHBILL AGENDA — not a current deployment recipe.
+# The current closed Nightshift runtime has no watchbill/--nq-db entrypoint.
+# No production or test target loads this agenda; the commands below preserve
+# the original pilot procedure and must not be used for modern integration.
 # Local sushi-k dogfood agenda.
 #
 # Target: disk_pressure finding on sushi-k itself, via the local nq
