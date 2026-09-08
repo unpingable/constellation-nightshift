@@ -448,6 +448,7 @@ pub fn qualify_current_purpose(
     {
         let support = &expected_request["continuity_support"];
         if support["schema"] != "nq.continuity-memory-support/v1"
+            || !support["snapshot_context"].is_object()
             || support["claim"] != "continuity_rely_eligible"
             || support["disposition"] != "eligible"
             || support["binding"]["subject_digest"] != expected_request["subject_digest"]
@@ -585,6 +586,12 @@ pub fn qualify_docket_current_purpose(
     let purpose = expected_request["purpose"]
         .as_str()
         .ok_or("purpose absent")?;
+    if expected_request["consumer"] == "nightshift-readonly-continuity"
+        && v["decision"] == "supported_readonly"
+        && !expected_request["continuity_support"]["snapshot_context"].is_object()
+    {
+        return Err("current continuity role lacks qualified snapshot-history context".into());
+    }
     if ![
         "continue_observing",
         "wait",
@@ -682,6 +689,9 @@ pub fn qualify_docket_current_purpose(
             v["decision"]
         );
         return Ok(result);
+    }
+    if !v["snapshot_context"].is_object() {
+        return Err("Docket current role lacks qualified snapshot-history context".into());
     }
     match port.resolve(&query) {
         Err(reason) => result.reason = format!("present evidence unavailable: {reason}"),
