@@ -397,6 +397,30 @@ pub struct CurrentPurposeDisposition {
 /// live present-evidence port. Only that port owns currentness. Neither an
 /// artifact timestamp nor a file containing an old support result is Fresh.
 #[allow(clippy::too_many_arguments)]
+fn require_snapshot_context(value: &serde_json::Value) -> Result<(), String> {
+    let map = value
+        .as_object()
+        .ok_or("qualified snapshot context missing")?;
+    if map.len() != 3 {
+        return Err("qualified snapshot context shape invalid".into());
+    }
+    for field in ["history_scope", "snapshot_key", "core_digest"] {
+        let hex = map
+            .get(field)
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.strip_prefix("sha256:"))
+            .ok_or("qualified snapshot context digest absent")?;
+        if hex.len() != 64
+            || !hex
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err("qualified snapshot context digest malformed".into());
+        }
+    }
+    Ok(())
+}
+
 pub fn qualify_current_purpose(
     bytes: &[u8],
     expected_request: &serde_json::Value,
@@ -448,7 +472,7 @@ pub fn qualify_current_purpose(
     {
         let support = &expected_request["continuity_support"];
         if support["schema"] != "nq.continuity-memory-support/v1"
-            || !support["snapshot_context"].is_object()
+            || require_snapshot_context(&support["snapshot_context"]).is_err()
             || support["claim"] != "continuity_rely_eligible"
             || support["disposition"] != "eligible"
             || support["binding"]["subject_digest"] != expected_request["subject_digest"]
@@ -588,7 +612,8 @@ pub fn qualify_docket_current_purpose(
         .ok_or("purpose absent")?;
     if expected_request["consumer"] == "nightshift-readonly-continuity"
         && v["decision"] == "supported_readonly"
-        && !expected_request["continuity_support"]["snapshot_context"].is_object()
+        && require_snapshot_context(&expected_request["continuity_support"]["snapshot_context"])
+            .is_err()
     {
         return Err("current continuity role lacks qualified snapshot-history context".into());
     }
@@ -690,9 +715,7 @@ pub fn qualify_docket_current_purpose(
         );
         return Ok(result);
     }
-    if !v["snapshot_context"].is_object() {
-        return Err("Docket current role lacks qualified snapshot-history context".into());
-    }
+    require_snapshot_context(&v["snapshot_context"])?;
     match port.resolve(&query) {
         Err(reason) => result.reason = format!("present evidence unavailable: {reason}"),
         Ok(support) => {

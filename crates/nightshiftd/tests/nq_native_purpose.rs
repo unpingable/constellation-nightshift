@@ -98,6 +98,28 @@ fn native_docket_policy_and_currentness_composition() {
             .iter()
             .any(|s| s.contains("no action")));
         if ["committed", "continuity"].contains(&name) {
+            for missing_context in [serde_json::Value::Null, serde_json::json!({})] {
+                use sha2::{Digest, Sha256};
+                let mut stateless = v.clone();
+                stateless["snapshot_context"] = missing_context;
+                stateless.as_object_mut().unwrap().remove("receipt_id");
+                stateless["receipt_id"] = serde_json::json!(format!(
+                    "sha256:{:x}",
+                    Sha256::digest(serde_jcs::to_vec(&stateless).unwrap())
+                ));
+                let bytes = serde_jcs::to_vec(&stateless).unwrap();
+                let error = qualify_docket_current_purpose(
+                    &bytes,
+                    &stateless["request"],
+                    stateless["generated_at"].as_str().unwrap(),
+                    "c",
+                    "n",
+                    "qualified-fixture-source",
+                    &mut PresentFixture("current"),
+                )
+                .unwrap_err();
+                assert!(error.contains("snapshot context"), "{error}");
+            }
             assert_eq!(
                 result.query.artifact_ids.len(),
                 if name == "continuity" { 3 } else { 2 }
