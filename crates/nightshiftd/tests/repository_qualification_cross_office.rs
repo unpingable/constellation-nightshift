@@ -38,7 +38,7 @@ fn ag_digest(label: &str) -> String {
 #[test]
 fn factual_nq_receipt_becomes_exact_nightshift_ag_basis() {
     let (Ok(nq_program), Ok(output_path)) = (
-        std::env::var("NQ_MONITOR_BIN"),
+        std::env::var("NQ_NG_BIN"),
         std::env::var("Q4_RESOLUTION_OUTPUT"),
     ) else {
         eprintln!("Q4 cross-office specimen not requested");
@@ -146,8 +146,8 @@ fn factual_nq_receipt_becomes_exact_nightshift_ag_basis() {
         profile_id: String::new(),
         expected_nq_profile_id: "q4-cross-office-profile".into(),
         expected_nq_profile_sha256: jcs_sha(&profile),
-        expected_nq_evaluator_id: "nq.campaign-stage-qualification-evaluator/v1".into(),
-        expected_nq_evaluator_version: env!("CARGO_PKG_VERSION").into(),
+        expected_nq_evaluator_id: "nq-ng.campaign-stage-qualification-evaluator/v1".into(),
+        expected_nq_evaluator_version: receipt["evaluator_version"].as_str().unwrap().into(),
         expected_nq_evaluator_executable_sha256: nq_sha,
         source_campaign_id: ag_digest("source-campaign"),
         source_occurrence_id: "00000000-0000-4000-8000-00000000000a".into(),
@@ -181,7 +181,7 @@ fn factual_nq_receipt_becomes_exact_nightshift_ag_basis() {
         exact_snapshot: snapshot,
     };
     let mut store = QualificationReceiptStoreV1::open(&temp.path().join("nightshift.db")).unwrap();
-    let mut verifier = NqMonitorQualificationVerifierV1::new(&nq_program).unwrap();
+    let mut verifier = NqNgQualificationVerifierV1::new(&nq_program).unwrap();
     let retained = store
         .ingest(&applicability, &profile, &evidence, &receipt, &mut verifier)
         .unwrap();
@@ -221,7 +221,7 @@ fn factual_nq_receipt_becomes_exact_nightshift_ag_basis() {
         .arg(&evidence_path)
         .arg("--nq-receipt")
         .arg(&receipt_path)
-        .arg("--nq-monitor")
+        .arg("--nq-executable")
         .arg(&nq_program)
         .output()
         .unwrap();

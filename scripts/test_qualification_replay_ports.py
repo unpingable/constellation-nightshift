@@ -23,8 +23,8 @@ class RestrictedReplayTests(unittest.TestCase):
                 ('"-",', '"result.json",'),
                 ('.output()', '.arg("execute").output()'),
                 ('.output()', '.env("MODE", "execute").output()'),
-                ('Some("nq-monitor")', 'Some("other-evaluator")'),
-                (' != Some("nq-monitor")', ' == Some("nq-monitor")'),
+                ('Some("nq")', 'Some("other-evaluator")'),
+                (' != Some("nq")', ' == Some("nq")'),
                 ('Command::new(&self.program)', 'Command::new("other-evaluator")'),
             )
             for old, new in substitutions:

@@ -23,10 +23,11 @@ pub const RESERVATION_APPLICABILITY_PROFILE_SCHEMA_V1: &str =
     "nightshift.repository-qualification-reservation-applicability-profile/v1";
 pub const RESERVATION_APPLICABILITY_BASIS_TYPE_V1: &str =
     "nightshift.repository-qualification-reservation-applicability/v1";
-pub const NQ_REALIZATION_PROFILE_SCHEMA_V2: &str = "nq.campaign-stage-realization-profile/v2";
-pub const NQ_REALIZATION_EVIDENCE_SCHEMA_V2: &str = "nq.campaign-stage-realization-evidence/v2";
-pub const NQ_REALIZATION_RECEIPT_SCHEMA_V2: &str = "nq.campaign-stage-realization-qualification/v2";
-pub const NQ_REALIZATION_REPLAY_SCHEMA_V2: &str = "nq.campaign-stage-realization-replay/v2";
+pub const NQ_REALIZATION_PROFILE_SCHEMA_V2: &str = "nq-ng.campaign-stage-realization-profile/v2";
+pub const NQ_REALIZATION_EVIDENCE_SCHEMA_V2: &str = "nq-ng.campaign-stage-realization-evidence/v2";
+pub const NQ_REALIZATION_RECEIPT_SCHEMA_V2: &str =
+    "nq-ng.campaign-stage-realization-qualification/v2";
+pub const NQ_REALIZATION_REPLAY_SCHEMA_V2: &str = "nq-ng.campaign-stage-realization-replay/v2";
 
 const NONCLAIMS: [&str; 7] = [
     "standing",
@@ -149,7 +150,7 @@ impl ReservationApplicabilityProfileV1 {
         }
         uuid::Uuid::parse_str(&self.source_occurrence_id)
             .map_err(|_| "source_occurrence_id must be a UUID".to_owned())?;
-        if self.expected_nq_evaluator_id != "nq.campaign-stage-realization-evaluator/v2"
+        if self.expected_nq_evaluator_id != "nq-ng.campaign-stage-realization-evaluator/v2"
             || self.max_age_ms == 0
             || self.profile_id != object_id(self, "profile_id")?
         {
@@ -250,15 +251,15 @@ pub trait ReservationQualificationVerifierV1 {
     ) -> Result<(), String>;
 }
 
-pub struct NqMonitorReservationVerifierV1 {
+pub struct NqNgReservationVerifierV1 {
     program: PathBuf,
 }
 
-impl NqMonitorReservationVerifierV1 {
+impl NqNgReservationVerifierV1 {
     pub fn new(program: impl Into<PathBuf>) -> Result<Self, String> {
         let program = program.into();
-        if program.file_name().and_then(|name| name.to_str()) != Some("nq-monitor") {
-            return Err("reservation verifier accepts only nq-monitor".into());
+        if program.file_name().and_then(|name| name.to_str()) != Some("nq") {
+            return Err("reservation verifier accepts only nq".into());
         }
         Ok(Self { program })
     }
@@ -272,7 +273,7 @@ impl NqMonitorReservationVerifierV1 {
     }
 }
 
-impl ReservationQualificationVerifierV1 for NqMonitorReservationVerifierV1 {
+impl ReservationQualificationVerifierV1 for NqNgReservationVerifierV1 {
     fn executable_sha256(&self) -> Result<String, String> {
         let bytes = std::fs::read(&self.program)
             .map_err(|error| format!("reading NQ evaluator executable: {error}"))?;
@@ -671,7 +672,7 @@ mod tests {
             evidence_reservation: reservation.clone(),
             expected_nq_profile_id: "velvet-pigeon/stage-1".into(),
             expected_nq_profile_sha256: jcs_sha256(&nq_profile).unwrap(),
-            expected_nq_evaluator_id: "nq.campaign-stage-realization-evaluator/v2".into(),
+            expected_nq_evaluator_id: "nq-ng.campaign-stage-realization-evaluator/v2".into(),
             expected_nq_evaluator_version: "0.1.0".into(),
             expected_nq_evaluator_executable_sha256: executable.clone(),
             source_campaign_id: digest('3'),

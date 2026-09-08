@@ -229,10 +229,10 @@ if ! rg -q 'Some\("pulse-project-predicate-support"\)' crates/nightshiftd/src/pr
     || ! rg -q '\.args\(\["replay"' crates/nightshiftd/src/project_predicate_attention.rs; then
     fail "generic attention port is not pinned to exact Pulse replay"
 fi
-if ! rg -q 'Some\("nq-monitor"\)' crates/nightshiftd/src/repository_qualification.rs \
+if ! rg -q 'Some\("nq"\)' crates/nightshiftd/src/repository_qualification.rs \
     || ! rg -q '"campaign-stage-qualification"' crates/nightshiftd/src/repository_qualification.rs \
     || ! rg -q '"replay"' crates/nightshiftd/src/repository_qualification.rs; then
-    fail "repository-qualification port is not pinned to exact nq-monitor replay"
+    fail "repository-qualification port is not pinned to exact NQ-ng nq replay"
 fi
 for forbidden_qualification_verb in evaluate execute import export watcher admit revoke collect; do
     if rg -n "\.arg(s)?\(.*\"${forbidden_qualification_verb}\"" crates/nightshiftd/src/repository_qualification.rs >/tmp/nightshift_exclusivity_hits 2>/dev/null; then

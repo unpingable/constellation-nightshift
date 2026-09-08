@@ -23,10 +23,10 @@ pub const QUALIFICATION_APPLICABILITY_SCHEMA_V1: &str =
 pub const AG_OBSERVATION_RESOLUTION_SCHEMA_V3: &str = "ag.governed-loop.observation-resolution/v3";
 pub const AG_TYPED_OBSERVATION_BASIS_SCHEMA_V1: &str =
     "ag.governed-loop.typed-observation-basis/v1";
-pub const NQ_PROFILE_SCHEMA_V1: &str = "nq.campaign-stage-qualification-profile/v1";
-pub const NQ_EVIDENCE_SCHEMA_V1: &str = "nq.campaign-stage-qualification-evidence/v1";
-pub const NQ_RECEIPT_SCHEMA_V1: &str = "nq.campaign-stage-qualification/v1";
-pub const NQ_REPLAY_SCHEMA_V1: &str = "nq.campaign-stage-qualification-replay/v1";
+pub const NQ_PROFILE_SCHEMA_V1: &str = "nq-ng.campaign-stage-qualification-profile/v1";
+pub const NQ_EVIDENCE_SCHEMA_V1: &str = "nq-ng.campaign-stage-qualification-evidence/v1";
+pub const NQ_RECEIPT_SCHEMA_V1: &str = "nq-ng.campaign-stage-qualification/v1";
+pub const NQ_REPLAY_SCHEMA_V1: &str = "nq-ng.campaign-stage-qualification-replay/v1";
 
 const NONCLAIMS: [&str; 6] = [
     "standing",
@@ -176,7 +176,7 @@ impl QualificationApplicabilityProfileV1 {
             .map_err(|_| "source_occurrence_id must be a UUID".to_owned())?;
         self.expected_result_head.validate()?;
         self.expected_result_tree.validate()?;
-        if self.expected_nq_evaluator_id != "nq.campaign-stage-qualification-evaluator/v1"
+        if self.expected_nq_evaluator_id != "nq-ng.campaign-stage-qualification-evaluator/v1"
             || self.max_age_ms == 0
             || self.profile_id != object_id(self, "profile_id")?
         {
@@ -269,15 +269,15 @@ pub trait QualificationReceiptVerifierV1 {
     ) -> Result<(), String>;
 }
 
-pub struct NqMonitorQualificationVerifierV1 {
+pub struct NqNgQualificationVerifierV1 {
     program: PathBuf,
 }
 
-impl NqMonitorQualificationVerifierV1 {
+impl NqNgQualificationVerifierV1 {
     pub fn new(program: impl Into<PathBuf>) -> Result<Self, String> {
         let program = program.into();
-        if program.file_name().and_then(|name| name.to_str()) != Some("nq-monitor") {
-            return Err("qualification verifier accepts only nq-monitor".into());
+        if program.file_name().and_then(|name| name.to_str()) != Some("nq") {
+            return Err("qualification verifier accepts only nq".into());
         }
         Ok(Self { program })
     }
@@ -291,7 +291,7 @@ impl NqMonitorQualificationVerifierV1 {
     }
 }
 
-impl QualificationReceiptVerifierV1 for NqMonitorQualificationVerifierV1 {
+impl QualificationReceiptVerifierV1 for NqNgQualificationVerifierV1 {
     fn executable_sha256(&self) -> Result<String, String> {
         let bytes = std::fs::read(&self.program)
             .map_err(|error| format!("reading NQ evaluator executable: {error}"))?;
@@ -824,7 +824,7 @@ mod tests {
         let mut receipt = NqReceiptV1 {
             schema: NQ_RECEIPT_SCHEMA_V1.into(),
             receipt_id: format!("receipt-{suffix}"),
-            evaluator_id: "nq.campaign-stage-qualification-evaluator/v1".into(),
+            evaluator_id: "nq-ng.campaign-stage-qualification-evaluator/v1".into(),
             evaluator_version: "0.1.0".into(),
             evaluator_executable_sha256: executable.clone(),
             evaluated_at_unix_ms: evaluated_at,
@@ -853,7 +853,7 @@ mod tests {
             profile_id: String::new(),
             expected_nq_profile_id: "nq-profile-1".into(),
             expected_nq_profile_sha256: jcs_sha256(&nq_profile).unwrap(),
-            expected_nq_evaluator_id: "nq.campaign-stage-qualification-evaluator/v1".into(),
+            expected_nq_evaluator_id: "nq-ng.campaign-stage-qualification-evaluator/v1".into(),
             expected_nq_evaluator_version: "0.1.0".into(),
             expected_nq_evaluator_executable_sha256: executable.clone(),
             source_campaign_id: digest('a'),

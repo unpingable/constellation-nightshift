@@ -1,5 +1,17 @@
 # Active classic retirement: Nightshift consumer contracts
 
+## Implementation return — CLASSIC-RETIREMENT (2026-09-08)
+
+NS-R1/R2 now have native NQ-ng stage evaluators and migrated replay/CLI/test
+consumers. Their modern schemas deliberately reject classic identity; typed
+factual qualification and time-relative Nightshift applicability remain separate.
+The inventory below is preserved as the pre-migration record, not silently
+rewritten into a zero-dependency claim. See
+[`MODERN_RETIREMENT_WITNESS.md`](../../../qualification/repository-qualification/MODERN_RETIREMENT_WITNESS.md)
+for exact current witness commands and boundaries. Independent acceptance of
+the integrated revisions remains required. NS-R3/R4 are separate owned lanes
+and are not retired by this change.
+
 Status: **BLOCKED ON NAMED MODERN CONTRACTS**, 2026-09-08. Integration owner:
 Constellation main campaign; implementation owner: Nightshift retirement lane.
 This is active release work, not an indefinite deferral. M2 remains closed;

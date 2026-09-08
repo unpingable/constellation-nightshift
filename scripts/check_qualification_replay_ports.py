@@ -1,8 +1,8 @@
 """Bounded source-shape gate, not a Rust parser or runtime qualification.
 
-These retained classic interfaces are transitional obligations. Restrict their
-whole subprocess expression, including argument order and process modifiers,
-until their modern semantic replacements have been independently qualified.
+The modern NQ-ng interfaces remain read-only replay ports. Restrict their whole
+subprocess expression, including argument order and process modifiers. Runtime
+cross-office qualification remains separate from this structural source check.
 """
 
 import pathlib
@@ -24,7 +24,7 @@ def check(source, operation):
     )
     if compact.count('Command::new') != 1 or expected not in compact:
         return False
-    pin = 'ifprogram.file_name().and_then(|name|name.to_str())!=Some("nq-monitor"){returnErr('
+    pin = 'ifprogram.file_name().and_then(|name|name.to_str())!=Some("nq"){returnErr('
     return pin in compact
 
 

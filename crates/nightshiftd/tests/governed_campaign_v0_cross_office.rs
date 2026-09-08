@@ -92,7 +92,7 @@ fn git_binding(digest: &str) -> serde_json::Value {
 #[test]
 fn three_real_git_stages_emit_three_exact_current_observations() {
     let (Ok(nq_program), Ok(output_path)) = (
-        std::env::var("NQ_MONITOR_BIN"),
+        std::env::var("NQ_NG_BIN"),
         std::env::var("GCL_V0_RESOLUTIONS_OUTPUT"),
     ) else {
         eprintln!("GCL V0 cross-office specimen not requested");
@@ -347,7 +347,7 @@ fn three_real_git_stages_emit_three_exact_current_observations() {
             .arg(&evidence_path)
             .arg("--nq-receipt")
             .arg(&receipt_path)
-            .arg("--nq-monitor")
+            .arg("--nq-executable")
             .arg(&nq_program)
             .output()
             .unwrap();
