@@ -30,7 +30,7 @@ struct Case {
 fn three_observatories_traverse_existing_project_predicate_path() {
     let cohort = PathBuf::from(required("ATPROTO_COHORT_ROOT"));
     let monitor = PathBuf::from(required("MONITOR_CONCERNS_BIN"));
-    let nq = PathBuf::from(required("NQ_MONITOR_BIN"));
+    let nq = PathBuf::from(required("NQ_NG_BIN"));
     let pulse = PathBuf::from(required("PULSE_PROJECT_PREDICATE_SUPPORT_BIN"));
     let catalog_path = PathBuf::from(required("NQ_PROJECT_PREDICATE_CATALOG"));
     let catalog: Value = serde_json::from_slice(&fs::read(&catalog_path).unwrap()).unwrap();
@@ -179,7 +179,7 @@ fn run_case(
     let input_schema_digest = digest(&profile["input_schema"]);
     let nq_receipt = root.path().join("nq.json");
     let admitted = Command::new(nq)
-        .args(["project-predicate", "admit", "--inventory"])
+        .args(["bounded-predicate", "admit", "--inventory"])
         .arg(&inventory_path)
         .arg("--profiles")
         .arg(catalog_path)
@@ -189,7 +189,12 @@ fn run_case(
         .unwrap();
     assert_success(&format!("{} NQ admission", case.project), &admitted);
     let nq_value: Value = serde_json::from_slice(&fs::read(&nq_receipt).unwrap()).unwrap();
-    assert_eq!(nq_value["disposition"], "ADMITTED_WITH_SCOPE");
+    // Modern admission binds the exact source and separately states the
+    // predicate result; successful transport alone establishes neither.
+    assert_eq!(nq_value["schema"], "nq.bounded-predicate-admission/v1");
+    assert_eq!(nq_value["semantic_conclusion"], true);
+    assert_eq!(nq_value["inventory_digest"], digest(&inventory));
+    assert_eq!(nq_value["catalog_digest"], catalog_digest);
 
     let signing_key = SigningKey::from_bytes(&[key_byte; 32]);
     let policy_id = format!("pulse.policy.{}-cohort/v1", case.project);

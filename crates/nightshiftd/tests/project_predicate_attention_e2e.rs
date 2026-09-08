@@ -21,10 +21,10 @@ use sha2::{Digest as _, Sha256};
 use tempfile::TempDir;
 
 #[test]
-#[ignore = "requires MONITOR_CONCERNS_BIN, NQ_MONITOR_BIN, and PULSE_PROJECT_PREDICATE_SUPPORT_BIN"]
+#[ignore = "requires MONITOR_CONCERNS_BIN, NQ_NG_BIN, and PULSE_PROJECT_PREDICATE_SUPPORT_BIN"]
 fn unfamiliar_project_reaches_distinct_evidence_attention_without_project_code() {
     let monitor = required_bin("MONITOR_CONCERNS_BIN");
-    let nq = required_bin("NQ_MONITOR_BIN");
+    let nq = required_bin("NQ_NG_BIN");
     let pulse = required_bin("PULSE_PROJECT_PREDICATE_SUPPORT_BIN");
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../qualification/project-predicate-attention/unfamiliar-project");
@@ -71,7 +71,7 @@ fn unfamiliar_project_reaches_distinct_evidence_attention_without_project_code()
     fs::write(&catalog_path, canonical(&catalog)).unwrap();
     let nq_receipt = root.path().join("nq-receipt.json");
     let nq_output = Command::new(&nq)
-        .args(["project-predicate", "admit", "--inventory"])
+        .args(["bounded-predicate", "admit", "--inventory"])
         .arg(&inventory_path)
         .arg("--profiles")
         .arg(&catalog_path)
