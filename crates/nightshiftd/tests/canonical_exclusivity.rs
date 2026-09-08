@@ -159,7 +159,8 @@ fn only_closed_upstream_verifiers_present_support_and_ag_are_process_boundaries(
             "currentness.rs",
             "nq_admission.rs",
             "project_predicate_attention.rs",
-            "repository_qualification.rs"
+            "repository_qualification.rs",
+            "reservation_qualification.rs"
         ]
     );
 
@@ -186,6 +187,16 @@ fn only_closed_upstream_verifiers_present_support_and_ag_are_process_boundaries(
         assert!(
             !repository_qualification.contains(forbidden),
             "repository qualification widened beyond exact replay: {forbidden}"
+        );
+    }
+    let reservation_qualification = read(src.join("reservation_qualification.rs"));
+    assert!(reservation_qualification.contains("Some(\"nq-monitor\")"));
+    assert!(reservation_qualification.contains("\"campaign-stage-realization\""));
+    assert!(reservation_qualification.contains("\"replay\""));
+    for forbidden in ["\"evaluate\"", "\"execute\"", "\"authorize\"", "\"continue\""] {
+        assert!(
+            !reservation_qualification.contains(forbidden),
+            "reservation qualification widened beyond exact replay: {forbidden}"
         );
     }
 }

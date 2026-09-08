@@ -78,14 +78,62 @@ Monitor/Pulse contract for R3, followed by bounded consumer changes and witnesse
 
 ### Observed existing gate debt
 
-`bash scripts/check_no_actuation_surface.sh` fails at both the unchanged base
+`bash scripts/check_no_actuation_surface.sh` failed at both the unchanged base
 checkout and this documentation-only branch: its closed subprocess file list
 does not include the already-present `reservation_qualification.rs` process
 site. This is a concrete NS-R2 qualification blocker, not a failure introduced
 by this note. Do not simply add the file to silence the gate; the modern
 reservation verifier needs its own restricted-operation controls in that gate.
-No Cargo behavior or modern replacement witness was executed in this
-documentation pass. `git diff --check` passes.
+No Cargo behavior or modern replacement witness was executed in that original
+documentation pass. Its result remains historical, not erased by later repair.
+
+### Bounded implementation return: replay-gate repair
+
+The successor repair adds the existing reservation replay source to the closed
+process graph **with** a full fixed-command-expression check for both replay
+ports, not a file allowlist alone. Direct substitution controls reject changed
+verbs, inserted arguments, changed output, process environment modifiers,
+changed executable/pin polarity and an additional process site. The Rust
+exclusivity witness now checks both retained replay ports. This is a bounded
+source-shape check, **not a Rust parser, runtime custody proof, modern evaluator
+qualification, or completed classic migration**. No runtime code, meaningful
+fixture, or historical acceptance was removed or relabeled.
+
+Run `python3 scripts/test_qualification_replay_ports.py`,
+`bash scripts/check_no_actuation_surface.sh`, and
+`cargo test --offline --test canonical_exclusivity`. The shell gate requires
+`rg` on PATH. Capture commands and actual outcomes on the exact integrated
+revision; the source edit does not inherit earlier test acceptance.
+
+### Actual-code scope estimates, not commitments
+
+Reinspection of NQ-ng `675e247e85d8e2e1f2801c06445bf863f82b3a5b`
+included `crates/nq-app/src/cli.rs:340` and
+`crates/nq-core/src/diagnostic_admission.rs:113`, not just command names.
+The existing qualifier proves retained diagnostic artifact/source/provider
+admission; it carries a judgment identity but does not evaluate the repository
+gate predicates, exact realization reservation, generic project predicates or
+consumer-purpose reliance rule required below. Nightshift's native
+`nq_admission.rs` already consumes that existing contract; using it as a factual
+predicate replacement would change the claimed guarantee.
+
+Estimates are assessment in engineer-days for a familiar owner, assuming one
+bounded native contract per item and available local fixture infrastructure;
+include focused positive/refusal/uncertainty tests, exclude independent-review
+latency. These are not additive portfolio estimates; shared prerequisites overlap.
+
+| Obligation | Nightshift code scope after prerequisite | Missing owner work / estimated order |
+| --- | --- | --- |
+| NS-R1 | `repository_qualification.rs` (1,055 lines overall; the subprocess adapter is about 70), CLI arguments, structural gate, two cross-office tests and witness instructions: **1–2 days**. Preserve typed subject/gate/artifact binding, status and replay semantics. | NQ-ng bounded repository/gate evaluator + deterministic replay/receipt and controls: **3–5 days**, then Nightshift, then AG-ng integrated witness. This is not 70 lines of basename replacement. |
+| NS-R2 | `reservation_qualification.rs` (874 lines, approximately 70-line subprocess adapter), CLI, resolver/store compatibility and reservation fixtures/docs: **1–2 days**. | NQ-ng exact reservation-realization evidence contract/evaluator/replay: **2–4 days after shared R1 foundation**, then Nightshift, then AG-ng generator/runner and new realization witness. |
+| NS-R3 | `project_predicate_attention.rs` (1,654 lines; Pulse replay adapter about 30), two explicit integration suites and qualification recipe: **1–2 days** if Pulse preserves qualified support semantics. | NQ-ng predicate admission/check and Monitor/Pulse authenticated support replay must land first. Native predicate work roughly **3–6 days**; Monitor owner must estimate its adapter separately. No scheduling redesign is required or authorized. |
+| NS-R4 | `nq_disposition.rs` (552 lines), two reliance test modules and fixture contract documentation: **1–2 days** after a named modern support/consumer-purpose result exists. | NQ-ng purpose-bound support/contradiction/refusal contract roughly **2–4 days**, then consumer adaptation. No production-bin caller found; library API remains live, so silently calling it historical is not completion. Explicit API removal would be a separate compatibility decision, not the inexpensive migration requested. |
+
+No established equivalent was found for these four contracts. None of these
+classic roles was retired by the gate repair. Historical fixtures continue to
+be read, actual upstream tests retain their prerequisites, and no fallback was
+introduced. The concrete blocked order above replaces an unbounded follow-up,
+without authorizing broad runtime redesign here.
 
 ## Retirement acceptance and historical custody
 

@@ -171,8 +171,8 @@ fi
 
 # The only process boundaries are exact, closed ports: read-only NQ admission
 # qualification, present-support resolution, exact Pulse receipt replay,
-# exact NQ repository-qualification replay, and AG occurrence opening/status.
-# Any sixth site is a new runtime authority or
+# exact NQ repository/reservation-qualification replay, and AG occurrence opening/status.
+# Any seventh site is a new runtime authority or
 # execution surface and fails closed.
 mapfile -t command_files < <(rg -l 'Command::new' "$production_src" | sort)
 expected_command_files=(
@@ -181,6 +181,7 @@ expected_command_files=(
     crates/nightshiftd/src/nq_admission.rs
     crates/nightshiftd/src/project_predicate_attention.rs
     crates/nightshiftd/src/repository_qualification.rs
+    crates/nightshiftd/src/reservation_qualification.rs
 )
 if [ "${command_files[*]}" != "${expected_command_files[*]}" ]; then
     fail "production subprocess files are not the exact closed port set: ${command_files[*]:-<none>}"
@@ -199,6 +200,12 @@ if [ "$(rg -c 'Command::new' crates/nightshiftd/src/project_predicate_attention.
 fi
 if [ "$(rg -c 'Command::new' crates/nightshiftd/src/repository_qualification.rs || true)" -ne 1 ]; then
     fail "repository-qualification ingress must contain exactly one subprocess site"
+fi
+# A closed file list alone cannot constrain the newly inventoried reservation
+# port. Check the entire fixed replay command chain for both retained classic
+# consumers; this is structural gate repair, not classic retirement.
+if ! python3 scripts/check_qualification_replay_ports.py; then
+    fail "qualification replay port widened beyond its exact read-only command"
 fi
 if ! rg -q 'Some\("ag-loopctl"\)' crates/nightshiftd/src/ag_port.rs; then
     fail "AG port is not executable-name pinned to ag-loopctl"
