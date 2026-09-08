@@ -115,6 +115,12 @@ docs/
 - The canonical authority office for governed work is AG ng; there is no
   production classic-Governor integration in this crate
 
+Classic NQ retirement is separate and incomplete. The active consumer inventory,
+named missing replacement contracts, and dependency order are in
+`docs/working/gaps/GAP-classic-retirement.md`. Do not introduce new classic
+dependencies or automatic fallback; historical qualification is not modern
+replacement acceptance.
+
 ---
 
 ## Invariants
