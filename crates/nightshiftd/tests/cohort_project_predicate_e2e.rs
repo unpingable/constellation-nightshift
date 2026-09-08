@@ -162,12 +162,17 @@ fn run_case(
     let observed_at = item["observation"]["observed_at"].as_str().unwrap();
     let facts = item["observation"]["facts"].clone();
     let manifest_digest = inventory["acquisition"]["manifest_digest"].as_str().unwrap();
+    let declaration_question = item["declaration"]["question"].as_str().unwrap();
 
     let profile = catalog["profiles"]
         .as_array()
         .unwrap()
         .iter()
-        .find(|profile| profile["subject"]["project"] == case.project && profile["subject"]["concern"] == case.concern)
+        .find(|profile| {
+            profile["subject"]["project"] == case.project
+                && profile["subject"]["concern"] == case.concern
+                && profile["question"] == declaration_question
+        })
         .unwrap();
     assert!(profile["accepted_manifest_digests"].as_array().unwrap().iter().any(|v| v == manifest_digest));
     let profile_digest = digest(profile);
