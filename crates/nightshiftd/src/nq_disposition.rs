@@ -415,12 +415,17 @@ pub fn qualify_current_purpose(
     }
     let dto = NqRelianceReceiptDto::parse_for_request(bytes, expected_request, observed_at)
         .map_err(|e| e.to_string())?;
-    if dto.purpose != "historical_readonly" || dto.consumer_profile_id != "nightshift-readonly" {
-        return Err("current composition requires explicit base historical eligibility; continuity prerequisites are not interchangeable".into());
+    if dto.purpose != "historical_readonly"
+        || !matches!(
+            dto.consumer_profile_id.as_str(),
+            "nightshift-readonly" | "nightshift-readonly-continuity"
+        )
+    {
+        return Err("current composition requires explicit native historical eligibility".into());
     }
     inputs.validate()?;
     let v: serde_json::Value = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
-    let ids = delivered_artifact_ids(inputs);
+    let mut ids = delivered_artifact_ids(inputs);
     if ids != vec![dto.receipt_content_hash.clone()] || inputs.inputs.len() != 1 {
         return Err("purpose support requires exact single-artifact input basis".into());
     }
@@ -433,6 +438,35 @@ pub fn qualify_current_purpose(
         return Err("purpose artifact bytes differ from qualified NQ source".into());
     }
     let subject = &v["source_artifact"]["subject"];
+    if dto.consumer_profile_id == "nightshift-readonly-continuity"
+        && dto.decision == "supported_readonly"
+    {
+        let support = &expected_request["continuity_support"];
+        if support["schema"] != "nq.continuity-memory-support/v1"
+            || support["claim"] != "continuity_rely_eligible"
+            || support["disposition"] != "eligible"
+            || support["binding"]["subject_digest"] != expected_request["subject_digest"]
+            || support["binding"]["principal"] != dto.consumer_profile_id
+            || support["binding"]["purpose"] != purpose
+        {
+            return Err("required named continuity evidence binding absent or mismatched".into());
+        }
+        let identity = support["receipt_id"]
+            .as_str()
+            .ok_or("continuity receipt identity missing")?;
+        if ids.iter().any(|id| id == identity) {
+            return Err("primary cannot be its own continuity support".into());
+        }
+        if !dto
+            .supporting_receipts
+            .iter()
+            .any(|s| s.claim == "continuity_rely_eligible" && s.content_hash == identity)
+        {
+            return Err("NQ did not disclose the bound continuity prerequisite".into());
+        }
+        ids.push(identity.into());
+        ids.sort();
+    }
     let observation_id=format!("sha256:{:x}",Sha256::digest(serde_jcs::to_vec(&serde_json::json!({"nq_decision_id":dto.decision_id,"purpose":purpose,"authority":expected_authority})).map_err(|e|e.to_string())?));
     let query = PresentEvidenceQueryV1 {
         schema: String::new(),

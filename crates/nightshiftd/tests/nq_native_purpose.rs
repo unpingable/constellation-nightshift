@@ -63,49 +63,59 @@ fn native_purpose_composes_existing_qualified_currentness_port() {
     use nightshiftd::diagnostic_posture::DiagnosticInputs;
     use nightshiftd::nq_disposition::qualify_current_purpose;
     let root = std::path::PathBuf::from(std::env::var("NQ_PURPOSE_FIXTURE_OUTPUT").unwrap());
-    let bytes = std::fs::read(root.join("historical-support.json")).unwrap();
-    let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    let a = &v["source_artifact"];
-    let mut inputs:DiagnosticInputs=serde_json::from_value(serde_json::json!({"schema":"nightshift.diagnostic_inputs.v2","inputs_id":"","inputs":[{"key":{"question_id":a["question"]["id"],"subject_id":a["subject"]["id"],"profile_id":a["profile"]["id"],"vantage_id":a["vantage"]["id"]},"status":"delivered","artifact":a}]})).unwrap();
-    inputs.inputs_id = inputs.computed_inputs_id().unwrap();
-    let run = |mode, purpose| {
-        qualify_current_purpose(
-            &bytes,
-            &v["request"],
-            v["generated_at"].as_str().unwrap(),
-            purpose,
-            &inputs,
-            "purpose-cycle-1",
-            "purpose-nonce-1",
-            "qualified-fixture-source",
-            &mut PresentFixture(mode),
-        )
-    };
-    let supported = run("current", "continue_observing").unwrap();
-    assert_eq!(supported.disposition, Disposition::ContinueObserving);
-    assert_eq!(
-        supported.support.unwrap().authority_id,
-        "qualified-fixture-source"
-    );
-    assert!(supported
-        .does_not_establish
-        .iter()
-        .any(|s| s.contains("no action")));
-    assert_eq!(
-        run("absent", "continue_observing").unwrap().disposition,
-        Disposition::EvidenceUnavailable
-    );
-    assert_eq!(
-        run("unknown", "continue_observing").unwrap().disposition,
-        Disposition::EvidenceUnavailable
-    );
-    assert_eq!(
-        run("expired", "continue_observing").unwrap().disposition,
-        Disposition::WaitForFreshEvidence
-    );
-    assert!(run("wrong-subject", "continue_observing").is_err());
-    assert!(run("wrong-authority", "continue_observing").is_err());
-    assert!(run("current", "execute").is_err());
+    for filename in ["historical-support.json", "continuity-support.json"] {
+        let bytes = std::fs::read(root.join(filename)).unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let a = &v["source_artifact"];
+        let mut inputs:DiagnosticInputs=serde_json::from_value(serde_json::json!({"schema":"nightshift.diagnostic_inputs.v2","inputs_id":"","inputs":[{"key":{"question_id":a["question"]["id"],"subject_id":a["subject"]["id"],"profile_id":a["profile"]["id"],"vantage_id":a["vantage"]["id"]},"status":"delivered","artifact":a}]})).unwrap();
+        inputs.inputs_id = inputs.computed_inputs_id().unwrap();
+        let run = |mode, purpose| {
+            qualify_current_purpose(
+                &bytes,
+                &v["request"],
+                v["generated_at"].as_str().unwrap(),
+                purpose,
+                &inputs,
+                "purpose-cycle-1",
+                "purpose-nonce-1",
+                "qualified-fixture-source",
+                &mut PresentFixture(mode),
+            )
+        };
+        let supported = run("current", "continue_observing").unwrap();
+        assert_eq!(
+            supported.query.artifact_ids.len(),
+            if filename == "continuity-support.json" {
+                2
+            } else {
+                1
+            }
+        );
+        assert_eq!(supported.disposition, Disposition::ContinueObserving);
+        assert_eq!(
+            supported.support.unwrap().authority_id,
+            "qualified-fixture-source"
+        );
+        assert!(supported
+            .does_not_establish
+            .iter()
+            .any(|s| s.contains("no action")));
+        assert_eq!(
+            run("absent", "continue_observing").unwrap().disposition,
+            Disposition::EvidenceUnavailable
+        );
+        assert_eq!(
+            run("unknown", "continue_observing").unwrap().disposition,
+            Disposition::EvidenceUnavailable
+        );
+        assert_eq!(
+            run("expired", "continue_observing").unwrap().disposition,
+            Disposition::WaitForFreshEvidence
+        );
+        assert!(run("wrong-subject", "continue_observing").is_err());
+        assert!(run("wrong-authority", "continue_observing").is_err());
+        assert!(run("current", "execute").is_err());
+    }
 }
 
 #[test]

@@ -35,3 +35,20 @@ no action authority is granted. Tests use actual native local-store factual
 evidence with an explicitly labeled qualified-port boundary fixture; this is
 not a production Pulse deployment witness. The continuity-gated specialized
 claim remains separate and cannot be satisfied by this base-role composition.
+
+## Named Continuity prerequisite implementation
+
+The remaining source is Continuity MEMORY `rely_export.v0`, not Standing
+substrate succession. Native NQ now qualifies its exact external projection as
+`nq.continuity-memory-support/v1`, preserving source premises/tiers/nonclaims and
+eligible vs noneligible vs indeterminate. The continuity consumer accepts only
+the exact principal/purpose/subject-bound named `continuity_rely_eligible`
+qualification disclosed by NQ. It adds that qualification identity alongside
+the primary diagnostic in the existing live present-evidence query. Missing,
+substituted, unrelated or expired current support cannot satisfy the gate.
+
+This replaces the previously recorded missing producer prerequisite without
+redefining historical evidence as current or turning NQ into temporal authority.
+Actual Continuity producer and NQ qualification are exercised on isolated local
+fixtures; the present-evidence adapter remains an explicitly labeled qualified
+boundary fixture, not a deployment qualification.
