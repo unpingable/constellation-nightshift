@@ -17,6 +17,7 @@ use crate::contract::{ContractError, ExecutionProfileV2, WorkerStartRequestV2};
 
 #[path = "provider_snapshot_translation.rs"]
 mod provider_snapshot_translation;
+pub use provider_snapshot_translation::derive_provider_deferral;
 pub use provider_snapshot_translation::derive_provider_snapshot_evidence;
 
 pub const EXECUTION_AVAILABILITY_OBSERVATION_SCHEMA_V1: &str =
@@ -45,10 +46,12 @@ pub const ACCEPTED_CODEX_PROVIDER_ADMISSION_OWNER_HEAD: &str =
 pub const ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_OWNER_HEAD: &str =
     "2ba25db66d8b29dd215bd87e05f4ea794024b3b7";
 // Explicit integration candidate enrollment; not inherited qualification.
-const BETA_CODEX_OWNER_HEAD: &str = "b7495765163ab124f4fba7935a79983eb18c87f9";
-const BETA_SWITCHYARD_OWNER_HEAD: &str = "d61b7192fed93355830d072145886d408e3b8e1e";
+const BETA_CODEX_OWNER_HEAD: &str = "6893ae42233aa95b1c1623497405681d99a589da";
+const BETA_SWITCHYARD_OWNER_HEAD: &str = "2207bb6ca19690a2c218fffe6c69e429eee24eb5";
 pub const ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_SHA256: &str =
     "sha256:131f1f6e0cf8cb0aea26ed225c584440c81ffedd443c68ace23adecbe493cf93";
+const BETA_SWITCHYARD_SCHEMA_SHA256: &str =
+    "sha256:448c2535c9c9586754d222912bbc86bc09fadb3c98059dc134141aff08efb8ba";
 pub const ACCEPTED_SWITCHYARD_DETERMINISTIC_FIXTURE_SHA256: &str =
     "sha256:cafa673ac58f60029fd6c1de229b4f57d9f42ba918b7ecb2a3bfb20cb2b41a31";
 pub const MAXIMUM_AVAILABILITY_EVIDENCE_BYTES: usize = 16 * 1024;
@@ -73,6 +76,9 @@ const DEFERRED_DOMAIN: &[u8] = b"nightshift.deferred-provider-dispatch.digest/v1
 const WORKER_START_REQUEST_DOMAIN_V3: &[u8] = b"nightshift.worker-start-request.digest/v3\0";
 const SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_BYTES: &[u8] =
     include_bytes!("../../../schemas/vendor/switchyard.codex-provider-admission.v1.schema.json");
+const BETA_SWITCHYARD_SCHEMA_BYTES: &[u8] = include_bytes!(
+    "../../../schemas/vendor/switchyard.codex-provider-admission.beta.v1.schema.json"
+);
 
 pub const HOLDING_QUALIFICATION_PRODUCER_ID: &str =
     "nightshift:holding-pattern-deterministic-fake-adapter";
@@ -710,6 +716,7 @@ impl ProviderAdmissionOwnerPinsV1 {
         Self {
             codex_owner_head: BETA_CODEX_OWNER_HEAD.to_owned(),
             switchyard_owner_head: BETA_SWITCHYARD_OWNER_HEAD.to_owned(),
+            switchyard_schema_sha256: BETA_SWITCHYARD_SCHEMA_SHA256.to_owned(),
             ..Self::accepted()
         }
     }
@@ -1993,7 +2000,17 @@ fn validate_switchyard_snapshot(
         return Err(ContractError::InvalidField("mapper record count"));
     }
     if records.iter().any(|record| {
+        // The ordered owner may also record local acquisition loss without a
+        // provider frame or fabricated stream ordinal. This exact rawless
+        // discrepancy is still fully replayed below and cannot admit execution.
+        let local_loss = record.get("kind").and_then(Value::as_str)
+            == Some("ADMISSION_DISCREPANCY")
+            && record.get("method").and_then(Value::as_str) == Some("adapter/acquisition")
+            && record.get("raw") == Some(&Value::Null)
+            && record.get("acquisition_ordinal") == Some(&Value::Null)
+            && record.get("acquisition_kind") == Some(&Value::Null);
         record.get("kind").and_then(Value::as_str) != Some("ACQUISITION_CUT")
+            && !local_loss
             && (record.get("acquisition_ordinal").is_none_or(Value::is_null)
                 || record.get("acquisition_kind").is_none_or(Value::is_null))
     }) {
@@ -2244,15 +2261,24 @@ fn validate_switchyard_snapshot(
 }
 
 fn validate_vendored_switchyard_schema(instance: &Value) -> Result<(), ContractError> {
-    if plain_sha256(SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_BYTES)
-        != ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_SHA256
-    {
+    // Closed source/schema pairs. Historical replay does not enroll an older
+    // executable for a new provider run; the full graph binds requirement pins.
+    let (bytes, expected) = match instance["binding"]["codex_source_head"].as_str() {
+        Some(ACCEPTED_CODEX_PROVIDER_ADMISSION_OWNER_HEAD) => (
+            SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_BYTES,
+            ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_SHA256,
+        ),
+        Some(BETA_CODEX_OWNER_HEAD) => {
+            (BETA_SWITCHYARD_SCHEMA_BYTES, BETA_SWITCHYARD_SCHEMA_SHA256)
+        }
+        _ => return Err(ContractError::InvalidField("snapshot schema owner")),
+    };
+    if plain_sha256(bytes) != expected {
         return Err(ContractError::DigestMismatch(
             "vendored Switchyard schema sha256",
         ));
     }
-    let root: Value =
-        serde_json::from_slice(SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_BYTES).map_err(json_error)?;
+    let root: Value = serde_json::from_slice(bytes).map_err(json_error)?;
     validate_schema_node(&root, &root, instance, 0)?;
     Ok(())
 }

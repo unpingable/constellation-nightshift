@@ -9,6 +9,187 @@ fn invoke(args: &[&str]) -> Output {
 }
 
 #[test]
+fn beta_mapper_fixtures_replay_under_exact_new_owner_schema_pair() {
+    for name in [
+        "completed",
+        "parked",
+        "indeterminate",
+        "interrupted",
+        "approval",
+    ] {
+        let (_directory, path, mut packet, mut admission, mut profile, policy, _) =
+            holding_fixture_contracts();
+        let fixture_time = chrono::DateTime::from_timestamp_millis(1788900000000).unwrap();
+        let shift = fixture_time - admission.admitted_at;
+        packet.created_at += shift;
+        packet.current_until += shift;
+        packet.seal().unwrap();
+        admission.packet_digest = packet.packet_digest.clone();
+        admission.admitted_at += shift;
+        admission.expires_at += shift;
+        admission.seal().unwrap();
+        profile.packet_digest = packet.packet_digest.clone();
+        profile.admission_digest = admission.admission_digest.clone();
+        profile.seal().unwrap();
+        let mut requirement = holding_requirement(&packet, &admission, &profile, &policy);
+        requirement.owner_pins = nightshift_foreman::ProviderAdmissionOwnerPinsV1::beta_candidate();
+        for selections in requirement.work_item_model_selections.values_mut() {
+            selections.truncate(1);
+            selections[0].model_id = "gpt-5.6-terra".to_owned();
+        }
+        requirement.seal().unwrap();
+        let store = ForemanStore::open(&path).unwrap();
+        store
+            .admit_with_execution_availability(
+                &packet.canonical_bytes().unwrap(),
+                &holding_canonical(&admission),
+                &holding_canonical(&profile),
+                &holding_canonical(&requirement),
+                &holding_canonical(&policy),
+                admission.admitted_at,
+            )
+            .unwrap();
+        let opened = store
+            .prepare_provider_attempt(
+                &admission.run_id,
+                "work-a",
+                "beta-dispatch",
+                "beta-process",
+                "beta-session",
+                0,
+                fixture_time,
+            )
+            .unwrap();
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../qualification/operator-beta-provider-20260908/fixtures")
+            .join(format!("{name}.json"));
+        let snapshot: Value = serde_json::from_slice(&fs::read(fixture).unwrap()).unwrap();
+        let raw = holding_retarget_snapshot(snapshot, &opened);
+        let received = fixture_time + Duration::seconds(2);
+        let derived = nightshift_foreman::derive_provider_snapshot_evidence(
+            &requirement,
+            &opened.dispatch,
+            &raw,
+            received,
+            received + Duration::seconds(60),
+        );
+        let (disposition, observation) = derived.unwrap_or_else(|error| panic!("{name}: {error}"));
+        if name == "approval" {
+            // Existing owner semantics retain a nonterminal wait, not completed
+            // work or permission to send an approval response.
+            assert_eq!(
+                disposition.mechanism_state,
+                ProviderMechanismStateV1::WaitingApproval
+            );
+            assert!(!disposition.acquisition_complete);
+            assert!(!disposition.approval_response_sent);
+            assert!(!disposition.permits_automatic_park());
+        }
+        if name == "indeterminate" || name == "interrupted" {
+            let source: Value = serde_json::from_slice(&raw).unwrap();
+            let provider_raw = source["records"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|record| !record["raw"].is_null())
+                .unwrap()["raw"]
+                .clone();
+            for (field, value) in [
+                ("kind", json!("LOCAL_TURN_FACT")),
+                ("method", json!("item/rawResponse/started")),
+                ("raw", provider_raw),
+                ("acquisition_ordinal", json!(0)),
+                ("acquisition_kind", json!("NOTIFICATION")),
+            ] {
+                let mut changed: Value = serde_json::from_slice(&raw).unwrap();
+                let local = changed["records"]
+                    .as_array_mut()
+                    .unwrap()
+                    .iter_mut()
+                    .find(|record| record["method"] == "adapter/acquisition")
+                    .unwrap();
+                local[field] = value;
+                let changed = holding_retarget_snapshot(changed, &opened);
+                assert!(nightshift_foreman::derive_provider_snapshot_evidence(
+                    &requirement,
+                    &opened.dispatch,
+                    &changed,
+                    received,
+                    received + Duration::seconds(60)
+                )
+                .is_err());
+            }
+        }
+        if name == "parked" {
+            let directory = tempfile::tempdir().unwrap();
+            let mut unrelated_policy = policy.clone();
+            unrelated_policy.policy_id = "not-the-admitted-policy".to_owned();
+            unrelated_policy.seal().unwrap();
+            for (file, bytes) in [
+                ("requirement", holding_canonical(&requirement)),
+                ("policy", holding_canonical(&unrelated_policy)),
+                ("dispatch", holding_canonical(&opened.dispatch)),
+                ("snapshot", raw.clone()),
+            ] {
+                fs::write(directory.path().join(file), bytes).unwrap();
+            }
+            let file = |name: &str| directory.path().join(name).to_str().unwrap().to_owned();
+            let output = invoke(&[
+                "provider-derive-evidence",
+                "--requirement",
+                &file("requirement"),
+                "--policy",
+                &file("policy"),
+                "--dispatch",
+                &file("dispatch"),
+                "--snapshot",
+                &file("snapshot"),
+                "--received-at",
+                &received.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                "--expires-at",
+                &(received + Duration::seconds(60))
+                    .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+            ]);
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let output: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(output["graph_validation"], "REFUSED");
+            assert_eq!(
+                output["disposition"]["disposition"],
+                "NOT_ADMITTED_MODEL_AT_CAPACITY"
+            );
+            assert!(output["deferred"].is_null());
+        }
+        nightshift_foreman::derive_provider_deferral(
+            &requirement,
+            &policy,
+            &opened.dispatch,
+            &observation,
+            &disposition,
+            &[],
+        )
+        .unwrap();
+        let mut old = requirement.clone();
+        old.owner_pins = nightshift_foreman::ProviderAdmissionOwnerPinsV1::accepted();
+        old.seal().unwrap();
+        assert!(nightshift_foreman::derive_provider_snapshot_evidence(
+            &old,
+            &opened.dispatch,
+            &raw,
+            received,
+            received + Duration::seconds(60)
+        )
+        .is_err());
+        let mut mixed = requirement.owner_pins.clone();
+        mixed.switchyard_schema_sha256 = old.owner_pins.switchyard_schema_sha256;
+        assert!(mixed.validate().is_err());
+    }
+}
+
+#[test]
 fn real_snapshot_translation_preserves_existing_owner_graph_and_uncertainty() {
     for name in [
         "completed",
@@ -46,6 +227,30 @@ fn real_snapshot_translation_preserves_existing_owner_graph_and_uncertainty() {
         let deferred = disposition
             .permits_automatic_park()
             .then(|| holding_deferred(&requirement, &policy, &opened, &disposition));
+        assert_eq!(
+            nightshift_foreman::derive_provider_deferral(
+                &requirement,
+                &policy,
+                &opened.dispatch,
+                &observation,
+                &disposition,
+                &[],
+            )
+            .unwrap(),
+            deferred
+        );
+        let mut wrong_policy = policy.clone();
+        wrong_policy.backoff_seconds[0] += 1;
+        wrong_policy.seal().unwrap();
+        assert!(nightshift_foreman::derive_provider_deferral(
+            &requirement,
+            &wrong_policy,
+            &opened.dispatch,
+            &observation,
+            &disposition,
+            &[],
+        )
+        .is_err());
         nightshift_foreman::validate_execution_availability_graph(
             &requirement,
             &policy,

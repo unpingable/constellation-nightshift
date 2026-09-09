@@ -1,6 +1,93 @@
 //! Thin translation of retained real mapper evidence into existing owner records.
 use super::*;
 
+/// Construct the existing park record from explicit owner policy, then reopen
+/// the whole graph. This neither admits another dispatch nor schedules a retry.
+pub fn derive_provider_deferral(
+    requirement: &ForemanExecutionAvailabilityRequirementV1,
+    policy: &ExecutionAvailabilityPolicyV1,
+    dispatch: &ProviderDispatchOccurrenceV1,
+    observation: &ExecutionAvailabilityObservationV1,
+    disposition: &ProviderAdmissionDispositionV1,
+    history: &[ProviderDeferralHistoryEntryV1],
+) -> Result<Option<DeferredProviderDispatchV1>, ContractError> {
+    requirement.validate()?;
+    policy.validate()?;
+    dispatch.validate()?;
+    disposition.validate()?;
+    let deferred = if disposition.permits_automatic_park() {
+        let index = dispatch
+            .dispatch_ordinal
+            .checked_sub(1)
+            .ok_or(ContractError::InvalidField("dispatch ordinal"))?;
+        let seconds = *policy
+            .backoff_seconds
+            .get(usize::from(index))
+            .ok_or(ContractError::InvalidField("policy backoff ordinal"))?;
+        let wake_at = match disposition.provider_retry_after {
+            Some(value) => value,
+            None => disposition
+                .received_at
+                .checked_add_signed(Duration::seconds(seconds as i64))
+                .ok_or(ContractError::InvalidField("wake timestamp overflow"))?,
+        };
+        let backoff_seconds = u64::try_from((wake_at - disposition.received_at).num_seconds())
+            .map_err(|_| ContractError::InvalidField("negative provider backoff"))?;
+        let selections = requirement
+            .work_item_model_selections
+            .get(&dispatch.work_item_id)
+            .ok_or(ContractError::InvalidField("work item model selections"))?;
+        let mut value = DeferredProviderDispatchV1 {
+            schema: DEFERRED_PROVIDER_DISPATCH_SCHEMA_V1.to_owned(),
+            deferred_dispatch_digest: format!("sha256:{}", "0".repeat(64)),
+            requirement_digest: requirement.requirement_digest.clone(),
+            policy_digest: policy.policy_digest.clone(),
+            disposition_digest: disposition.disposition_digest.clone(),
+            packet_digest: requirement.packet_digest.clone(),
+            run_id: requirement.run_id.clone(),
+            work_item_id: dispatch.work_item_id.clone(),
+            work_attempt_id: dispatch.work_attempt_id.clone(),
+            last_dispatch_occurrence_id: dispatch.dispatch_occurrence_id.clone(),
+            provider_id: dispatch.selection.provider_id.clone(),
+            model_id: dispatch.selection.model_id.clone(),
+            selected_model_ordinal: dispatch.selected_model_ordinal,
+            remaining_model_ordinals: if policy.allow_ordered_model_fallback {
+                ((dispatch.selected_model_ordinal + 1)..selections.len() as u16).collect()
+            } else {
+                Vec::new()
+            },
+            refusal_received_at: disposition.received_at,
+            wake_basis: if disposition.provider_retry_after.is_some() {
+                DeferredWakeBasisV1::ProviderRetryAfter
+            } else {
+                DeferredWakeBasisV1::PolicyBackoff
+            },
+            backoff_ordinal: index,
+            backoff_seconds,
+            provider_retry_after: disposition.provider_retry_after,
+            wake_at,
+            parked_resource_lock_policy: policy.parked_resource_lock_policy,
+            provider_capacity_released: true,
+            semantic_retry: false,
+            authority_effect: "LOCAL_AGENT_COMPUTE_SCHEDULING_ONLY".to_owned(),
+        };
+        value.seal()?;
+        Some(value)
+    } else {
+        None
+    };
+    validate_execution_availability_graph(
+        requirement,
+        policy,
+        dispatch,
+        observation,
+        disposition,
+        history,
+        deferred.as_ref(),
+    )?;
+    Ok(deferred)
+}
+
 /// Derive mechanism records, not a worker result or permission to redispatch.
 /// Exact mapper replay and the complete requirement graph are still validated
 /// by the existing disposition/store boundary. Callers supply an explicit

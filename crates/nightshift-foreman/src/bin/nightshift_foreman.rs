@@ -9,9 +9,10 @@ use anyhow::{Context as _, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use nightshift_foreman::{
-    derive_provider_snapshot_evidence, ExecutionProfileV2, ForemanAdmissionV1,
-    ForemanExecutionAvailabilityRequirementV1, ForemanStore, ProviderDispatchOccurrenceV1,
-    ProviderDispositionEvidenceV1, SelfHostedBootstrapInputsV1,
+    derive_provider_deferral, derive_provider_snapshot_evidence, ExecutionAvailabilityPolicyV1,
+    ExecutionProfileV2, ForemanAdmissionV1, ForemanExecutionAvailabilityRequirementV1,
+    ForemanStore, ProviderDispatchOccurrenceV1, ProviderDispositionEvidenceV1,
+    SelfHostedBootstrapInputsV1,
 };
 
 const MAXIMUM_BOOTSTRAP_INPUT_BYTES: u64 = 16 * 1024 * 1024;
@@ -33,6 +34,10 @@ struct Cli {
 enum Command {
     /// Translate retained mapper evidence; store admission remains a separate gate.
     ProviderDeriveEvidence {
+        #[arg(long)]
+        policy: PathBuf,
+        #[arg(long)]
+        history: Option<PathBuf>,
         #[arg(long)]
         requirement: PathBuf,
         #[arg(long)]
@@ -256,6 +261,8 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::ProviderDeriveEvidence {
+            policy,
+            history,
             requirement,
             dispatch,
             snapshot,
@@ -274,9 +281,36 @@ fn main() -> Result<()> {
                 instant(&received_at)?,
                 instant(&expires_at)?,
             )?;
-            print_json(
-                &serde_json::json!({"disposition": disposition, "observation": observation}),
-            )?;
+            let policy =
+                ExecutionAvailabilityPolicyV1::from_slice(&read_bounded_existing(&policy)?)?;
+            let history: Vec<nightshift_foreman::ProviderDeferralHistoryEntryV1> = history
+                .as_ref()
+                .map(|path| -> Result<_> {
+                    Ok(serde_json::from_slice(&read_bounded_existing(path)?)?)
+                })
+                .transpose()?
+                .unwrap_or_default();
+            let graph = derive_provider_deferral(
+                &requirement,
+                &policy,
+                &dispatch,
+                &observation,
+                &disposition,
+                &history,
+            );
+            // Translation is read-only. Retain the source disposition when a
+            // supported mapper outcome cannot lawfully enter this owner graph
+            // (for example a subsecond hint in the whole-second park protocol).
+            // This does not admit the disposition or close an owner attempt.
+            let (deferred, graph_validation, graph_refusal) = match graph {
+                Ok(value) => (value, "VALIDATED", None),
+                Err(error) => (None, "REFUSED", Some(error.to_string())),
+            };
+            print_json(&serde_json::json!({
+                "disposition": disposition, "observation": observation,
+                "deferred": deferred, "graph_validation": graph_validation,
+                "graph_refusal": graph_refusal,
+            }))?;
         }
         Command::ProviderSealInputs { draft } => {
             write_raw(&provider_cli_inputs::seal(&read_bounded_existing(&draft)?)?)?;

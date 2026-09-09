@@ -3658,6 +3658,23 @@ fn holding_retarget_snapshot(
 ) -> Vec<u8> {
     let replacements = [
         (
+            "beta-fixture-attempt",
+            opened.dispatch.work_attempt_id.as_str(),
+        ),
+        (
+            "beta-fixture-dispatch",
+            opened.dispatch.dispatch_occurrence_id.as_str(),
+        ),
+        (
+            "beta-fixture-process",
+            opened.dispatch.adapter_process_occurrence_id.as_str(),
+        ),
+        (
+            "beta-fixture-estate",
+            opened.dispatch.app_server_session_identity.as_str(),
+        ),
+        ("gpt-5.6-terra", opened.dispatch.selection.model_id.as_str()),
+        (
             "attempt-holding-1",
             opened.dispatch.work_attempt_id.as_str(),
         ),
