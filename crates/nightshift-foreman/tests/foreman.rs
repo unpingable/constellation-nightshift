@@ -54,6 +54,9 @@ use serde_json::{json, Value};
 use sha2::{Digest as _, Sha256};
 use tempfile::TempDir;
 
+#[path = "provider_cases/cli.rs"]
+mod provider_cli_cases;
+
 fn bind_predecessor_fixture(
     mut brief: Value,
     dependency: &str,

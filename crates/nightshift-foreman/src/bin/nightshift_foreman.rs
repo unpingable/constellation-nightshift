@@ -9,7 +9,8 @@ use anyhow::{Context as _, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use nightshift_foreman::{
-    ExecutionProfileV2, ForemanAdmissionV1, ForemanStore, SelfHostedBootstrapInputsV1,
+    ExecutionProfileV2, ForemanAdmissionV1, ForemanStore, ProviderDispositionEvidenceV1,
+    SelfHostedBootstrapInputsV1,
 };
 
 const MAXIMUM_BOOTSTRAP_INPUT_BYTES: u64 = 16 * 1024 * 1024;
@@ -26,6 +27,61 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Admit exact existing provider-mechanism contracts; grants no target authority.
+    ProviderAdmit {
+        #[arg(long)]
+        db: PathBuf,
+        #[arg(long)]
+        packet: PathBuf,
+        #[arg(long)]
+        admission: PathBuf,
+        #[arg(long)]
+        profile: PathBuf,
+        #[arg(long)]
+        requirement: PathBuf,
+        #[arg(long)]
+        policy: PathBuf,
+        #[arg(long)]
+        evaluated_at: String,
+    },
+    /// Atomically reserve one attempt and its exact provider dispatch, without launching.
+    ProviderPrepare {
+        #[arg(long)]
+        db: PathBuf,
+        #[arg(long)]
+        run_id: String,
+        #[arg(long)]
+        work_item: String,
+        #[arg(long)]
+        dispatch: String,
+        #[arg(long)]
+        adapter_process: String,
+        #[arg(long)]
+        app_server_session: String,
+        #[arg(long)]
+        selected_model_ordinal: u16,
+        #[arg(long)]
+        recorded_at: String,
+    },
+    /// Retain independently derived provider evidence through the existing owner gate.
+    ProviderRecord {
+        #[arg(long)]
+        db: PathBuf,
+        #[arg(long)]
+        run_id: String,
+        #[arg(long)]
+        work_item: String,
+        #[arg(long)]
+        attempt_id: String,
+        #[arg(long)]
+        observation: PathBuf,
+        #[arg(long)]
+        disposition: PathBuf,
+        #[arg(long)]
+        deferred: Option<PathBuf>,
+        #[arg(long)]
+        predecessor_disposition_digest: Option<String>,
+    },
     SealAdmission {
         #[arg(long)]
         draft: PathBuf,
@@ -177,6 +233,80 @@ enum Command {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
+        Command::ProviderAdmit {
+            db,
+            packet,
+            admission,
+            profile,
+            requirement,
+            policy,
+            evaluated_at,
+        } => {
+            let packet = read_bounded_existing(&packet)?;
+            let admission = read_bounded_existing(&admission)?;
+            let profile = read_bounded_existing(&profile)?;
+            let requirement = read_bounded_existing(&requirement)?;
+            let policy = read_bounded_existing(&policy)?;
+            let run_id = ForemanStore::open(db)?.admit_with_execution_availability(
+                &packet,
+                &admission,
+                &profile,
+                &requirement,
+                &policy,
+                instant(&evaluated_at)?,
+            )?;
+            print_json(&serde_json::json!({"run_id": run_id}))?;
+        }
+        Command::ProviderPrepare {
+            db,
+            run_id,
+            work_item,
+            dispatch,
+            adapter_process,
+            app_server_session,
+            selected_model_ordinal,
+            recorded_at,
+        } => {
+            let opened = ForemanStore::open(db)?.prepare_provider_attempt(
+                &run_id,
+                &work_item,
+                &dispatch,
+                &adapter_process,
+                &app_server_session,
+                selected_model_ordinal,
+                instant(&recorded_at)?,
+            )?;
+            print_json(&serde_json::json!({
+                "worker_start_request": opened.worker_start_request,
+                "dispatch": opened.dispatch,
+            }))?;
+        }
+        Command::ProviderRecord {
+            db,
+            run_id,
+            work_item,
+            attempt_id,
+            observation,
+            disposition,
+            deferred,
+            predecessor_disposition_digest,
+        } => {
+            let observation = read_bounded_existing(&observation)?;
+            let disposition = read_bounded_existing(&disposition)?;
+            let deferred = deferred.as_ref().map(read_bounded_existing).transpose()?;
+            let result = ForemanStore::open(db)?.record_provider_disposition(
+                &run_id,
+                &work_item,
+                &attempt_id,
+                ProviderDispositionEvidenceV1 {
+                    observation_bytes: &observation,
+                    disposition_bytes: &disposition,
+                    deferred_bytes: deferred.as_deref(),
+                },
+                predecessor_disposition_digest.as_deref(),
+            )?;
+            print_json(&result)?;
+        }
         Command::SealAdmission { draft } => {
             let mut admission = ForemanAdmissionV1::from_slice(&read(&draft)?)?;
             admission.seal()?;
@@ -338,7 +468,7 @@ fn read_bounded_existing(path: &PathBuf) -> Result<Vec<u8>> {
     let mut options = OpenOptions::new();
     options
         .read(true)
-        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
     let mut file = options
         .open(path)
         .with_context(|| format!("cannot open bounded input {}", path.display()))?;
