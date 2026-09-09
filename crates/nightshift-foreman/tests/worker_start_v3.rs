@@ -19,9 +19,20 @@ type V3Substitution = Box<dyn Fn(&mut WorkerStartRequestV3)>;
 
 #[test]
 fn explicit_beta_owner_tuple_preserves_requirement_binding_without_fallback() {
+    check_candidate_tuple(ProviderAdmissionOwnerPinsV1::beta_candidate());
+    check_candidate_tuple(ProviderAdmissionOwnerPinsV1::final_beta_candidate());
+    let mut hybrid = ProviderAdmissionOwnerPinsV1::final_beta_candidate();
+    hybrid.switchyard_owner_head = ProviderAdmissionOwnerPinsV1::beta_candidate().switchyard_owner_head;
+    assert!(hybrid.validate().is_err());
+    let mut hybrid = ProviderAdmissionOwnerPinsV1::final_beta_candidate();
+    hybrid.switchyard_schema_sha256 = ProviderAdmissionOwnerPinsV1::beta_candidate().switchyard_schema_sha256;
+    assert!(hybrid.validate().is_err());
+}
+
+fn check_candidate_tuple(pins: ProviderAdmissionOwnerPinsV1) {
     let profile = profile();
     let mut requirement = requirement(&profile);
-    requirement.owner_pins = ProviderAdmissionOwnerPinsV1::beta_candidate();
+    requirement.owner_pins = pins;
     requirement.seal().unwrap();
     let request = WorkerStartRequestV3::from_v2_for_dispatch(
         &canonical(&v2()),

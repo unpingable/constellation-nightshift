@@ -105,6 +105,15 @@ fn terminal_sealing_is_canonical_but_neither_assessment_nor_owner_intake() {
 
 #[test]
 fn beta_mapper_fixtures_replay_under_exact_new_owner_schema_pair() {
+    mapper_fixture_family(false);
+}
+
+#[test]
+fn final_mapper_fixtures_replay_under_exact_final_owner_schema_pair() {
+    mapper_fixture_family(true);
+}
+
+fn mapper_fixture_family(final_pair: bool) {
     for name in [
         "completed",
         "parked",
@@ -127,7 +136,11 @@ fn beta_mapper_fixtures_replay_under_exact_new_owner_schema_pair() {
         profile.admission_digest = admission.admission_digest.clone();
         profile.seal().unwrap();
         let mut requirement = holding_requirement(&packet, &admission, &profile, &policy);
-        requirement.owner_pins = nightshift_foreman::ProviderAdmissionOwnerPinsV1::beta_candidate();
+        requirement.owner_pins = if final_pair {
+            nightshift_foreman::ProviderAdmissionOwnerPinsV1::final_beta_candidate()
+        } else {
+            nightshift_foreman::ProviderAdmissionOwnerPinsV1::beta_candidate()
+        };
         for selections in requirement.work_item_model_selections.values_mut() {
             selections.truncate(1);
             selections[0].model_id = "gpt-5.6-terra".to_owned();
@@ -156,7 +169,7 @@ fn beta_mapper_fixtures_replay_under_exact_new_owner_schema_pair() {
             )
             .unwrap();
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../qualification/operator-beta-provider-20260908/fixtures")
+            .join(if final_pair { "../../qualification/operator-beta-provider-20260908/final-fixtures" } else { "../../qualification/operator-beta-provider-20260908/fixtures" })
             .join(format!("{name}.json"));
         let snapshot: Value = serde_json::from_slice(&fs::read(fixture).unwrap()).unwrap();
         let raw = holding_retarget_snapshot(snapshot, &opened);
