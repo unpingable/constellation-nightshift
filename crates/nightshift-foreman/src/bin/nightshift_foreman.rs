@@ -32,6 +32,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Seal an existing worker receipt shape; does not assess or admit its claims.
+    SealTerminalReceipt {
+        #[arg(long)]
+        draft: PathBuf,
+    },
     /// Translate retained mapper evidence; store admission remains a separate gate.
     ProviderDeriveEvidence {
         #[arg(long)]
@@ -260,6 +265,12 @@ enum Command {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
+        Command::SealTerminalReceipt { draft } => {
+            let mut receipt =
+                nightshift_foreman::TerminalReceiptV1::from_slice(&read_bounded_existing(&draft)?)?;
+            receipt.seal()?;
+            write_raw(&serde_jcs::to_vec(&receipt)?)?;
+        }
         Command::ProviderDeriveEvidence {
             policy,
             history,

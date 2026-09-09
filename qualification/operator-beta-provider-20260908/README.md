@@ -27,6 +27,11 @@ Optional `--history` supplies the exact existing deferral chain. `provider-recor
 performs durable owner intake. Derivation never retries or authorizes another
 dispatch, and provider completion is not a worker-result acceptance receipt.
 
+`seal-terminal-receipt --draft ...` applies the existing typed worker-receipt
+encoding and digest law only. It neither assesses claims nor performs owner
+intake. Independent task assessment and exact output evidence remain separate;
+the existing `accept-receipt` and `close` gates still determine lifecycle state.
+
 Old source/schema pairs remain available for historical replay; the beta is an
 explicit separately enrolled tuple, never an automatic fallback. The historical
 deterministic-suite hash in V3 refers only to that retained regression input,

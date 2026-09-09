@@ -9,6 +9,42 @@ fn invoke(args: &[&str]) -> Output {
 }
 
 #[test]
+fn terminal_sealing_is_canonical_but_neither_assessment_nor_owner_intake() {
+    let (directory, store, packet, _, _) = setup();
+    let request = store
+        .prepare_attempt("run-fixture", "root-a", instant(1))
+        .unwrap();
+    let expected = terminal(
+        &packet,
+        &request,
+        "UNASSESSED-CLAIM",
+        "NO-AUTOMATIC-QUALIFICATION",
+    );
+    let mut draft = expected.clone();
+    draft.receipt_digest = holding_placeholder();
+    let path = directory.path().join("draft.json");
+    fs::write(&path, holding_canonical(&draft)).unwrap();
+    let before = store.export_events("run-fixture").unwrap();
+    let output = invoke(&["seal-terminal-receipt", "--draft", path.to_str().unwrap()]);
+    assert!(output.status.success());
+    assert_eq!(output.stdout, holding_canonical(&expected));
+    assert_eq!(store.export_events("run-fixture").unwrap(), before);
+    assert!(store.close("run-fixture", instant(6)).is_err());
+    let mut foreign: Value = serde_json::from_slice(&holding_canonical(&draft)).unwrap();
+    foreign["grants_authority"] = json!(true);
+    fs::write(&path, holding_canonical(&foreign)).unwrap();
+    assert!(
+        !invoke(&["seal-terminal-receipt", "--draft", path.to_str().unwrap()])
+            .status
+            .success()
+    );
+    assert!(!invoke(&["seal-terminal-receipt", "--draft", "/dev/null"])
+        .status
+        .success());
+    assert_eq!(store.export_events("run-fixture").unwrap(), before);
+}
+
+#[test]
 fn beta_mapper_fixtures_replay_under_exact_new_owner_schema_pair() {
     for name in [
         "completed",
