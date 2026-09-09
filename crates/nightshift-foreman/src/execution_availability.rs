@@ -47,7 +47,8 @@ pub const ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_OWNER_HEAD: &str =
     "2ba25db66d8b29dd215bd87e05f4ea794024b3b7";
 // Explicit integration candidate enrollment; not inherited qualification.
 const FINAL_CODEX_OWNER_HEAD: &str = "97b0acd5ce2ccb3c87a763606696c35a450947f6";
-const FINAL_SWITCHYARD_OWNER_HEAD: &str = "4f85615ef6ebe5483ab96afe6e046b4ea10566c6";
+const PRIOR_FINAL_SWITCHYARD_OWNER_HEAD: &str = "4f85615ef6ebe5483ab96afe6e046b4ea10566c6";
+const FINAL_SWITCHYARD_OWNER_HEAD: &str = "c01fb1ee586d33a5031d1d928ce40fcabfb4f4f2";
 const FINAL_SWITCHYARD_SCHEMA_SHA256: &str =
     "sha256:0e9c851cc9fad9538408ab44d84737d5f4d4d7ef39f2fd5db20c6f88fc7fbb9e";
 const FINAL_SWITCHYARD_SCHEMA_BYTES: &[u8] = include_bytes!(
@@ -718,6 +719,14 @@ pub struct ProviderAdmissionOwnerPinsV1 {
 }
 
 impl ProviderAdmissionOwnerPinsV1 {
+    /// Historical pre-precision-correction tuple, retained for exact replay.
+    pub fn prior_final_beta_candidate() -> Self {
+        Self {
+            switchyard_owner_head: PRIOR_FINAL_SWITCHYARD_OWNER_HEAD.to_owned(),
+            ..Self::final_beta_candidate()
+        }
+    }
+
     /// Explicit final candidate; prior tuples remain historical replay inputs.
     pub fn final_beta_candidate() -> Self {
         Self {
@@ -750,6 +759,7 @@ impl ProviderAdmissionOwnerPinsV1 {
     pub fn validate(&self) -> Result<(), ContractError> {
         if self != &Self::accepted()
             && self != &Self::beta_candidate()
+            && self != &Self::prior_final_beta_candidate()
             && self != &Self::final_beta_candidate()
         {
             return Err(ContractError::InvalidField("provider admission owner pins"));
