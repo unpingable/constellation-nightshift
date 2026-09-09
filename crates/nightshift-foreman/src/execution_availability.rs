@@ -49,6 +49,7 @@ pub const ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_OWNER_HEAD: &str =
 const FINAL_CODEX_OWNER_HEAD: &str = "97b0acd5ce2ccb3c87a763606696c35a450947f6";
 const PRIOR_FINAL_SWITCHYARD_OWNER_HEAD: &str = "4f85615ef6ebe5483ab96afe6e046b4ea10566c6";
 const FINAL_SWITCHYARD_OWNER_HEAD: &str = "c01fb1ee586d33a5031d1d928ce40fcabfb4f4f2";
+const BOUNDED_CONTEXT_SWITCHYARD_OWNER_HEAD: &str = "1407186638bdd6f90cccf887af87d85a0e114cce";
 const FINAL_SWITCHYARD_SCHEMA_SHA256: &str =
     "sha256:0e9c851cc9fad9538408ab44d84737d5f4d4d7ef39f2fd5db20c6f88fc7fbb9e";
 const FINAL_SWITCHYARD_SCHEMA_BYTES: &[u8] = include_bytes!(
@@ -719,6 +720,15 @@ pub struct ProviderAdmissionOwnerPinsV1 {
 }
 
 impl ProviderAdmissionOwnerPinsV1 {
+    /// Explicit bounded-context candidate; it shares the qualified wire schema
+    /// and fixture with the final candidate but is a distinct source owner.
+    pub fn bounded_context_candidate() -> Self {
+        Self {
+            switchyard_owner_head: BOUNDED_CONTEXT_SWITCHYARD_OWNER_HEAD.to_owned(),
+            ..Self::final_beta_candidate()
+        }
+    }
+
     /// Historical pre-precision-correction tuple, retained for exact replay.
     pub fn prior_final_beta_candidate() -> Self {
         Self {
@@ -761,6 +771,7 @@ impl ProviderAdmissionOwnerPinsV1 {
             && self != &Self::beta_candidate()
             && self != &Self::prior_final_beta_candidate()
             && self != &Self::final_beta_candidate()
+            && self != &Self::bounded_context_candidate()
         {
             return Err(ContractError::InvalidField("provider admission owner pins"));
         }

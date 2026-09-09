@@ -131,6 +131,26 @@ class WorkerStartV3SchemaTest(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 self.validator.validate(changed)
 
+    def test_bounded_context_tuple_is_exact_and_hybrids_refuse(self):
+        candidate = copy.deepcopy(value())
+        candidate["codex_owner_head"] = "97b0acd5ce2ccb3c87a763606696c35a450947f6"
+        candidate["switchyard_owner_head"] = (
+            "1407186638bdd6f90cccf887af87d85a0e114cce"
+        )
+        candidate["switchyard_schema_sha256"] = (
+            "sha256:0e9c851cc9fad9538408ab44d84737d5f4d4d7ef39f2fd5db20c6f88fc7fbb9e"
+        )
+        self.validator.validate(candidate)
+
+        for field, replacement in (
+            ("codex_owner_head", value()["codex_owner_head"]),
+            ("switchyard_schema_sha256", value()["switchyard_schema_sha256"]),
+        ):
+            hybrid = copy.deepcopy(candidate)
+            hybrid[field] = replacement
+            with self.assertRaises(ValidationError):
+                self.validator.validate(hybrid)
+
     def test_lowercase_exact_predecessor_and_bounds(self):
         for field, replacement in (
             ("predecessor_bytes_hex", "7B7D"),
