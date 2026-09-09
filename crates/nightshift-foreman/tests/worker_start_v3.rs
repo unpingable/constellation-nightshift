@@ -22,10 +22,14 @@ fn explicit_beta_owner_tuple_preserves_requirement_binding_without_fallback() {
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::beta_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::prior_final_beta_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::final_beta_candidate());
-    assert_eq!(ProviderAdmissionOwnerPinsV1::final_beta_candidate().switchyard_owner_head,
-        "c01fb1ee586d33a5031d1d928ce40fcabfb4f4f2");
-    assert_eq!(ProviderAdmissionOwnerPinsV1::prior_final_beta_candidate().switchyard_owner_head,
-        "4f85615ef6ebe5483ab96afe6e046b4ea10566c6");
+    assert_eq!(
+        ProviderAdmissionOwnerPinsV1::final_beta_candidate().switchyard_owner_head,
+        "c01fb1ee586d33a5031d1d928ce40fcabfb4f4f2"
+    );
+    assert_eq!(
+        ProviderAdmissionOwnerPinsV1::prior_final_beta_candidate().switchyard_owner_head,
+        "4f85615ef6ebe5483ab96afe6e046b4ea10566c6"
+    );
     let mut hybrid = ProviderAdmissionOwnerPinsV1::final_beta_candidate();
     hybrid.switchyard_owner_head =
         ProviderAdmissionOwnerPinsV1::beta_candidate().switchyard_owner_head;
