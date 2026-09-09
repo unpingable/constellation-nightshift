@@ -8,7 +8,7 @@
 
 use nightshiftd::nq_disposition::{
     derive_disposition, Disposition, NqRelianceReceiptDto, SourceState, EXPECTED_CONSUMER_PROFILE,
-    NQ_RELIANCE_RECEIPT_SCHEMA,
+    HISTORICAL_NQ_RELIANCE_RECEIPT_SCHEMA,
 };
 
 const NOW: &str = "2026-07-26T00:00:00Z";
@@ -16,7 +16,7 @@ const CONTINUITY_PROFILE: &str = "nightshift-readonly-continuity";
 
 fn receipt_json(profile: &str, decision: &str, supporting: serde_json::Value) -> serde_json::Value {
     serde_json::json!({
-        "schema": NQ_RELIANCE_RECEIPT_SCHEMA,
+        "schema": HISTORICAL_NQ_RELIANCE_RECEIPT_SCHEMA,
         "decision_id": "sha256:dddd",
         "request_digest": "sha256:rrrr",
         "evidence_context_digest": "sha256:eeee",
@@ -64,7 +64,7 @@ fn supporting_refs_parse_and_are_preserved_in_order() {
     ]);
     let v = receipt_json(CONTINUITY_PROFILE, "authorized_reliance", two);
     let dto =
-        NqRelianceReceiptDto::parse_checked(&serde_json::to_vec(&v).unwrap(), CONTINUITY_PROFILE)
+        NqRelianceReceiptDto::parse_historical_checked(&serde_json::to_vec(&v).unwrap(), CONTINUITY_PROFILE)
             .unwrap();
     assert_eq!(dto.supporting_receipts.len(), 2);
     assert_eq!(dto.supporting_receipts[0].content_hash, "sha256:s1");
@@ -80,7 +80,7 @@ fn a_receipt_without_supporting_refs_still_parses() {
         serde_json::json!([]),
     );
     v.as_object_mut().unwrap().remove("supporting_receipts");
-    let dto = NqRelianceReceiptDto::parse_checked(
+    let dto = NqRelianceReceiptDto::parse_historical_checked(
         &serde_json::to_vec(&v).unwrap(),
         EXPECTED_CONSUMER_PROFILE,
     )
@@ -95,7 +95,7 @@ fn an_unidentifiable_supporting_disclosure_is_malformed() {
         serde_json::json!([{"claim": "c", "content_hash": "", "status": "verified", "subject": "a"}]),
     ] {
         let v = receipt_json(CONTINUITY_PROFILE, "authorized_reliance", broken);
-        assert!(NqRelianceReceiptDto::parse_checked(
+        assert!(NqRelianceReceiptDto::parse_historical_checked(
             &serde_json::to_vec(&v).unwrap(),
             CONTINUITY_PROFILE
         )
@@ -108,7 +108,7 @@ fn an_unidentifiable_supporting_disclosure_is_malformed() {
 #[test]
 fn a_continuity_receipt_is_refused_under_the_base_expectation() {
     let v = receipt_json(CONTINUITY_PROFILE, "authorized_reliance", supporting_ref());
-    let err = NqRelianceReceiptDto::parse_checked(
+    let err = NqRelianceReceiptDto::parse_historical_checked(
         &serde_json::to_vec(&v).unwrap(),
         EXPECTED_CONSUMER_PROFILE,
     )
@@ -120,7 +120,7 @@ fn a_continuity_receipt_is_refused_under_the_base_expectation() {
 fn a_continuity_receipt_is_accepted_under_the_continuity_expectation() {
     let v = receipt_json(CONTINUITY_PROFILE, "authorized_reliance", supporting_ref());
     let dto =
-        NqRelianceReceiptDto::parse_checked(&serde_json::to_vec(&v).unwrap(), CONTINUITY_PROFILE)
+        NqRelianceReceiptDto::parse_historical_checked(&serde_json::to_vec(&v).unwrap(), CONTINUITY_PROFILE)
             .unwrap();
     assert_eq!(dto.consumer_profile_id, CONTINUITY_PROFILE);
 }
@@ -132,7 +132,7 @@ fn a_base_receipt_is_refused_under_the_continuity_expectation() {
         "authorized_reliance",
         serde_json::json!([]),
     );
-    assert!(NqRelianceReceiptDto::parse_checked(
+    assert!(NqRelianceReceiptDto::parse_historical_checked(
         &serde_json::to_vec(&v).unwrap(),
         CONTINUITY_PROFILE
     )
@@ -145,7 +145,7 @@ fn a_base_receipt_is_refused_under_the_continuity_expectation() {
 fn supporting_identities_ride_the_source_binding_verbatim() {
     let v = receipt_json(CONTINUITY_PROFILE, "authorized_reliance", supporting_ref());
     let dto =
-        NqRelianceReceiptDto::parse_checked(&serde_json::to_vec(&v).unwrap(), CONTINUITY_PROFILE)
+        NqRelianceReceiptDto::parse_historical_checked(&serde_json::to_vec(&v).unwrap(), CONTINUITY_PROFILE)
             .unwrap();
     let rec = derive_disposition(&SourceState::Fresh, Some(&dto), NOW, CONTINUITY_PROFILE);
     let bound = &rec.source.as_ref().unwrap().supporting_receipts;
@@ -164,7 +164,7 @@ fn a_binding_without_supporting_refs_serializes_without_the_key() {
         "authorized_reliance",
         serde_json::json!([]),
     );
-    let dto = NqRelianceReceiptDto::parse_checked(
+    let dto = NqRelianceReceiptDto::parse_historical_checked(
         &serde_json::to_vec(&v).unwrap(),
         EXPECTED_CONSUMER_PROFILE,
     )
@@ -185,7 +185,7 @@ fn a_binding_without_supporting_refs_serializes_without_the_key() {
 fn disposition_id_is_deterministic_and_input_sensitive() {
     let v = receipt_json(CONTINUITY_PROFILE, "authorized_reliance", supporting_ref());
     let dto =
-        NqRelianceReceiptDto::parse_checked(&serde_json::to_vec(&v).unwrap(), CONTINUITY_PROFILE)
+        NqRelianceReceiptDto::parse_historical_checked(&serde_json::to_vec(&v).unwrap(), CONTINUITY_PROFILE)
             .unwrap();
     let r1 = derive_disposition(&SourceState::Fresh, Some(&dto), NOW, CONTINUITY_PROFILE);
     let r2 = derive_disposition(&SourceState::Fresh, Some(&dto), NOW, CONTINUITY_PROFILE);
@@ -205,7 +205,7 @@ fn disposition_id_matches_recomputation_over_the_emitted_record() {
     use sha2::{Digest, Sha256};
     let v = receipt_json(CONTINUITY_PROFILE, "authorized_reliance", supporting_ref());
     let dto =
-        NqRelianceReceiptDto::parse_checked(&serde_json::to_vec(&v).unwrap(), CONTINUITY_PROFILE)
+        NqRelianceReceiptDto::parse_historical_checked(&serde_json::to_vec(&v).unwrap(), CONTINUITY_PROFILE)
             .unwrap();
     let rec = derive_disposition(&SourceState::Fresh, Some(&dto), NOW, CONTINUITY_PROFILE);
     let mut probe = serde_json::to_value(&rec).unwrap();
@@ -227,7 +227,7 @@ fn missing_support_and_no_response_never_blur() {
         serde_json::json!([]),
     );
     let dto =
-        NqRelianceReceiptDto::parse_checked(&serde_json::to_vec(&v).unwrap(), CONTINUITY_PROFILE)
+        NqRelianceReceiptDto::parse_historical_checked(&serde_json::to_vec(&v).unwrap(), CONTINUITY_PROFILE)
             .unwrap();
     let refused = derive_disposition(&SourceState::Fresh, Some(&dto), NOW, CONTINUITY_PROFILE);
     assert!(refused.source_state.is_nq_testimony());

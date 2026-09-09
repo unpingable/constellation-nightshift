@@ -6,14 +6,14 @@
 
 use nightshiftd::nq_disposition::{
     derive_disposition, Disposition, NqRelianceReceiptDto, SourceState, EXPECTED_CONSUMER_PROFILE,
-    NQ_RELIANCE_RECEIPT_SCHEMA,
+    HISTORICAL_NQ_RELIANCE_RECEIPT_SCHEMA,
 };
 
 const NOW: &str = "2026-07-26T00:00:00Z";
 
 fn receipt_json(decision: &str, underlying: &str) -> serde_json::Value {
     serde_json::json!({
-        "schema": NQ_RELIANCE_RECEIPT_SCHEMA,
+        "schema": HISTORICAL_NQ_RELIANCE_RECEIPT_SCHEMA,
         "decision_id": "sha256:dddd",
         "request_digest": "sha256:rrrr",
         "evidence_context_digest": "sha256:eeee",
@@ -40,7 +40,7 @@ fn receipt_json(decision: &str, underlying: &str) -> serde_json::Value {
 }
 
 fn parse(v: &serde_json::Value) -> NqRelianceReceiptDto {
-    NqRelianceReceiptDto::parse_checked(&serde_json::to_vec(v).unwrap(), EXPECTED_CONSUMER_PROFILE)
+    NqRelianceReceiptDto::parse_historical_checked(&serde_json::to_vec(v).unwrap(), EXPECTED_CONSUMER_PROFILE)
         .expect("valid receipt")
 }
 
@@ -216,11 +216,11 @@ fn transport_unavailable_is_also_night_shifts_observation() {
 // 9. malformed JSON refuses at the contract boundary
 #[test]
 fn malformed_and_wrong_schema_receipts_are_refused_before_disposition() {
-    assert!(NqRelianceReceiptDto::parse_checked(b"{not json", EXPECTED_CONSUMER_PROFILE).is_err());
+    assert!(NqRelianceReceiptDto::parse_historical_checked(b"{not json", EXPECTED_CONSUMER_PROFILE).is_err());
 
     let mut wrong = receipt_json("authorized_reliance", "verified");
     wrong["schema"] = serde_json::json!("nq.reliance.receipt.v99");
-    assert!(NqRelianceReceiptDto::parse_checked(
+    assert!(NqRelianceReceiptDto::parse_historical_checked(
         &serde_json::to_vec(&wrong).unwrap(),
         EXPECTED_CONSUMER_PROFILE
     )
@@ -232,7 +232,7 @@ fn malformed_and_wrong_schema_receipts_are_refused_before_disposition() {
 fn receipt_for_a_different_consumer_is_refused() {
     let mut other = receipt_json("authorized_reliance", "verified");
     other["consumer_profile_id"] = serde_json::json!("operator-review");
-    let err = NqRelianceReceiptDto::parse_checked(
+    let err = NqRelianceReceiptDto::parse_historical_checked(
         &serde_json::to_vec(&other).unwrap(),
         EXPECTED_CONSUMER_PROFILE,
     )
@@ -299,7 +299,7 @@ fn source_identities_are_preserved_verbatim() {
     assert_eq!(s.receipt_content_hash, "sha256:cccc");
     assert_eq!(s.request_digest, "sha256:rrrr");
     assert_eq!(s.evidence_context_digest, "sha256:eeee");
-    assert_eq!(s.schema, NQ_RELIANCE_RECEIPT_SCHEMA);
+    assert_eq!(s.schema, HISTORICAL_NQ_RELIANCE_RECEIPT_SCHEMA);
     assert_eq!(s.decision, "authorized_reliance");
     assert_eq!(s.underlying_status, "verified");
     // The binding disclosure is carried, and never rewritten as authenticated.
@@ -314,7 +314,7 @@ fn source_identities_are_preserved_verbatim() {
 fn a_receipt_without_a_binding_disclosure_is_not_consumable() {
     let mut v = receipt_json("authorized_reliance", "verified");
     v["caller_binding_disclosure"] = serde_json::json!("   ");
-    assert!(NqRelianceReceiptDto::parse_checked(
+    assert!(NqRelianceReceiptDto::parse_historical_checked(
         &serde_json::to_vec(&v).unwrap(),
         EXPECTED_CONSUMER_PROFILE
     )

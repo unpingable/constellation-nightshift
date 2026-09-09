@@ -175,7 +175,7 @@ fn only_closed_upstream_verifiers_present_support_and_ag_are_process_boundaries(
     }
 
     let repository_qualification = read(src.join("repository_qualification.rs"));
-    assert!(repository_qualification.contains("Some(\"nq-monitor\")"));
+    assert!(repository_qualification.contains("Some(\"nq\")"));
     assert!(repository_qualification.contains("\"campaign-stage-qualification\""));
     assert!(repository_qualification.contains("\"replay\""));
     for forbidden in [
@@ -187,6 +187,21 @@ fn only_closed_upstream_verifiers_present_support_and_ag_are_process_boundaries(
         assert!(
             !repository_qualification.contains(forbidden),
             "repository qualification widened beyond exact replay: {forbidden}"
+        );
+    }
+    let reservation_qualification = read(src.join("reservation_qualification.rs"));
+    assert!(reservation_qualification.contains("Some(\"nq\")"));
+    assert!(reservation_qualification.contains("\"campaign-stage-realization\""));
+    assert!(reservation_qualification.contains("\"replay\""));
+    for forbidden in [
+        "\"evaluate\"",
+        "\"execute\"",
+        "\"authorize\"",
+        "\"continue\"",
+    ] {
+        assert!(
+            !reservation_qualification.contains(forbidden),
+            "reservation qualification widened beyond exact replay: {forbidden}"
         );
     }
 }

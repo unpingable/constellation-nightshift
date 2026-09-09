@@ -43,7 +43,15 @@ recurrence axes.
 
 ## Read-only reliance disposition specimen
 
-The isolated `nq.reliance.receipt.v1` consumer preserves these source states:
+The native `nq.diagnostic-purpose-support/v1` consumer now requires explicit
+request-bound ingestion. Historical `nq.reliance.receipt.v1` vectors remain only
+behind an expressly named archive reader; no current-mode fallback exists.
+`historical_readonly` is retained-claim consideration, not operational currency.
+`continue_observing` fails closed without current-source prerequisites. See
+[the R4 qualification boundary](working/gaps/NATIVE_PURPOSE_SUPPORT_RETIREMENT.md).
+
+The consumer preserves these source states (response freshness never implies
+source-world freshness):
 
 | Source state | Meaning |
 |---|---|

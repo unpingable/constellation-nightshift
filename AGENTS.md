@@ -115,6 +115,13 @@ docs/
 - The canonical authority office for governed work is AG ng; there is no
   production classic-Governor integration in this crate
 
+Scoped source/test classic retirement was independently closed at the recorded
+CLASSIC-RETIREMENT revisions; installed/fleet state was not established. The
+historical inventory and current return are in
+`docs/working/gaps/GAP-classic-retirement.md`. Do not introduce new classic
+dependencies or automatic fallback; historical qualification is not modern
+replacement acceptance.
+
 ---
 
 ## Invariants

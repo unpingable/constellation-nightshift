@@ -226,6 +226,11 @@ fi
 if [ "$(rg -c 'Command::new' crates/nightshiftd/src/reservation_qualification.rs || true)" -ne 1 ]; then
     fail "reservation-realization ingress must contain exactly one subprocess site"
 fi
+# Preserve both the exact site count and retirement's whole command-chain
+# checks for the modern NQ-ng replay consumers. Neither alone is qualification.
+if ! python3 scripts/check_qualification_replay_ports.py; then
+    fail "qualification replay port widened beyond its exact read-only command"
+fi
 if ! rg -q 'Some\("ag-loopctl"\)' crates/nightshiftd/src/ag_port.rs; then
     fail "AG port is not executable-name pinned to ag-loopctl"
 fi
@@ -248,15 +253,15 @@ if ! rg -q 'Some\("pulse-project-predicate-support"\)' crates/nightshiftd/src/pr
     || ! rg -q '\.args\(\["replay"' crates/nightshiftd/src/project_predicate_attention.rs; then
     fail "generic attention port is not pinned to exact Pulse replay"
 fi
-if ! rg -q 'Some\("nq-monitor"\)' crates/nightshiftd/src/repository_qualification.rs \
+if ! rg -q 'Some\("nq"\)' crates/nightshiftd/src/repository_qualification.rs \
     || ! rg -q '"campaign-stage-qualification"' crates/nightshiftd/src/repository_qualification.rs \
     || ! rg -q '"replay"' crates/nightshiftd/src/repository_qualification.rs; then
-    fail "repository-qualification port is not pinned to exact nq-monitor replay"
+    fail "repository-qualification port is not pinned to exact NQ-ng nq replay"
 fi
-if ! rg -q 'Some\("nq-monitor"\)' crates/nightshiftd/src/reservation_qualification.rs \
+if ! rg -q 'Some\("nq"\)' crates/nightshiftd/src/reservation_qualification.rs \
     || ! rg -q '"campaign-stage-realization"' crates/nightshiftd/src/reservation_qualification.rs \
     || ! rg -q '"replay"' crates/nightshiftd/src/reservation_qualification.rs; then
-    fail "reservation-realization port is not pinned to exact nq-monitor replay"
+    fail "reservation-realization port is not pinned to exact NQ-ng nq replay"
 fi
 for forbidden_qualification_verb in evaluate execute import export watcher admit revoke collect; do
     if rg -n "\.arg(s)?\(.*\"${forbidden_qualification_verb}\"" crates/nightshiftd/src/repository_qualification.rs >/tmp/nightshift_exclusivity_hits 2>/dev/null; then

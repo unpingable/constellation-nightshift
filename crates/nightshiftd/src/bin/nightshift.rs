@@ -40,12 +40,10 @@ use nightshiftd::project_predicate_attention::{
     AttentionStoreV1, PulseReplayInputsV1,
 };
 use nightshiftd::repository_qualification::{
-    NqMonitorQualificationVerifierV1, QualificationApplicabilityProfileV1,
-    QualificationReceiptStoreV1,
+    NqNgQualificationVerifierV1, QualificationApplicabilityProfileV1, QualificationReceiptStoreV1,
 };
 use nightshiftd::reservation_qualification::{
-    NqMonitorReservationVerifierV1, ReservationApplicabilityProfileV1,
-    ReservationRealizationStoreV1,
+    NqNgReservationVerifierV1, ReservationApplicabilityProfileV1, ReservationRealizationStoreV1,
 };
 use nightshiftd::steady_state_evidence::{
     SteadyStateEvidenceProfileV1, SteadyStateObservationHandoffV1, SteadyStateObservationVerifierV1,
@@ -202,7 +200,7 @@ struct RepositoryQualificationIngestArguments {
     #[arg(long)]
     nq_receipt: PathBuf,
     #[arg(long)]
-    nq_monitor: PathBuf,
+    nq_executable: PathBuf,
 }
 
 #[derive(Debug, Subcommand)]
@@ -222,7 +220,7 @@ struct ReservationQualificationIngestArguments {
     #[arg(long)]
     nq_receipt: PathBuf,
     #[arg(long)]
-    nq_monitor: PathBuf,
+    nq_executable: PathBuf,
 }
 #[derive(Debug, Subcommand)]
 enum ExternalObservationCommand {
@@ -573,14 +571,14 @@ fn run_repository_qualification_command(
                 nq_profile,
                 nq_evidence,
                 nq_receipt,
-                nq_monitor,
+                nq_executable,
             } = *arguments;
             let applicability: QualificationApplicabilityProfileV1 = read_exact(&applicability)?;
             let profile: serde_json::Value = read_exact(&nq_profile)?;
             let evidence: serde_json::Value = read_exact(&nq_evidence)?;
             let receipt: serde_json::Value = read_exact(&nq_receipt)?;
             let mut verifier =
-                NqMonitorQualificationVerifierV1::new(nq_monitor).map_err(anyhow::Error::msg)?;
+                NqNgQualificationVerifierV1::new(nq_executable).map_err(anyhow::Error::msg)?;
             let mut store =
                 QualificationReceiptStoreV1::open(store_path).map_err(anyhow::Error::msg)?;
             let retained = store
@@ -602,14 +600,14 @@ fn run_reservation_qualification_command(
                 nq_profile,
                 nq_evidence,
                 nq_receipt,
-                nq_monitor,
+                nq_executable,
             } = *arguments;
             let applicability: ReservationApplicabilityProfileV1 = read_exact(&applicability)?;
             let profile: serde_json::Value = read_exact(&nq_profile)?;
             let evidence: serde_json::Value = read_exact(&nq_evidence)?;
             let receipt: serde_json::Value = read_exact(&nq_receipt)?;
             let mut verifier =
-                NqMonitorReservationVerifierV1::new(nq_monitor).map_err(anyhow::Error::msg)?;
+                NqNgReservationVerifierV1::new(nq_executable).map_err(anyhow::Error::msg)?;
             let mut store =
                 ReservationRealizationStoreV1::open(store_path).map_err(anyhow::Error::msg)?;
             let retained = store
