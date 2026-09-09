@@ -9,6 +9,65 @@ fn invoke(args: &[&str]) -> Output {
 }
 
 #[test]
+fn receipt_readback_is_exact_read_only_and_distinguishes_absent_from_unknown() {
+    let (directory, store, packet, _, _) = setup();
+    let database = directory.path().join("foreman.sqlite");
+    let query = |item: &str| {
+        invoke(&[
+            "terminal-receipt",
+            "--db",
+            database.to_str().unwrap(),
+            "--run-id",
+            "run-fixture",
+            "--work-item",
+            item,
+        ])
+    };
+    let before = fs::read(&database).unwrap();
+    let absent = query("root-a");
+    assert!(absent.status.success());
+    let absent: Value = serde_json::from_slice(&absent.stdout).unwrap();
+    assert_eq!(absent["state"], "ABSENT");
+    assert!(absent["receipt_bytes_hex"].is_null());
+    assert!(!query("not-enrolled").status.success());
+    assert_eq!(fs::read(&database).unwrap(), before);
+    let request = store
+        .prepare_attempt("run-fixture", "root-a", instant(1))
+        .unwrap();
+    let receipt = holding_canonical(&terminal(&packet, &request, "FIXTURE", "UNASSESSED"));
+    store.accept_terminal_receipt(&receipt).unwrap();
+    let before = fs::read(&database).unwrap();
+    let events = store.export_events("run-fixture").unwrap();
+    let present = query("root-a");
+    assert!(
+        present.status.success(),
+        "{}",
+        String::from_utf8_lossy(&present.stderr)
+    );
+    let present: Value = serde_json::from_slice(&present.stdout).unwrap();
+    assert_eq!(present["state"], "PRESENT");
+    assert_eq!(
+        hex::decode(present["receipt_bytes_hex"].as_str().unwrap()).unwrap(),
+        receipt
+    );
+    assert_eq!(fs::read(&database).unwrap(), before);
+    assert_eq!(store.export_events("run-fixture").unwrap(), events);
+    let missing = directory.path().join("missing.sqlite");
+    assert!(!invoke(&[
+        "terminal-receipt",
+        "--db",
+        missing.to_str().unwrap(),
+        "--run-id",
+        "run-fixture",
+        "--work-item",
+        "root-a"
+    ])
+    .status
+    .success());
+    assert!(!missing.exists());
+}
+
+#[test]
 fn terminal_sealing_is_canonical_but_neither_assessment_nor_owner_intake() {
     let (directory, store, packet, _, _) = setup();
     let request = store

@@ -31,6 +31,12 @@ dispatch, and provider completion is not a worker-result acceptance receipt.
 encoding and digest law only. It neither assesses claims nor performs owner
 intake. Independent task assessment and exact output evidence remain separate;
 the existing `accept-receipt` and `close` gates still determine lifecycle state.
+`terminal-receipt --db ... --run-id ... --work-item ...` reads the existing
+transaction-consistent, validated owner snapshot. It returns exact retained
+receipt bytes as hex or explicit ABSENT for an enrolled item; missing databases,
+unknown runs/items and inconsistent evidence are errors, never absence. This
+allows acknowledgement-loss reconciliation without reissuing provider work or
+blindly repeating accepted owner effects.
 
 Old source/schema pairs remain available for historical replay; the beta is an
 explicit separately enrolled tuple, never an automatic fallback. The historical

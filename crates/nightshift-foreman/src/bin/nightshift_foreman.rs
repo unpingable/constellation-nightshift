@@ -32,6 +32,15 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Inspect exact owner-held receipt bytes without migrations or mutation.
+    TerminalReceipt {
+        #[arg(long)]
+        db: PathBuf,
+        #[arg(long)]
+        run_id: String,
+        #[arg(long)]
+        work_item: String,
+    },
     /// Seal an existing worker receipt shape; does not assess or admit its claims.
     SealTerminalReceipt {
         #[arg(long)]
@@ -265,6 +274,31 @@ enum Command {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
+        Command::TerminalReceipt {
+            db,
+            run_id,
+            work_item,
+        } => {
+            let snapshot = ForemanStore::open_read_only(db)?.read_only_run_snapshot(&run_id)?;
+            anyhow::ensure!(
+                snapshot
+                    .projection
+                    .work_items
+                    .iter()
+                    .any(|item| item.work_item_id == work_item),
+                "unknown work item"
+            );
+            let receipt = snapshot
+                .terminal_receipts
+                .into_iter()
+                .find(|receipt| receipt.work_item_id == work_item)
+                .map(|receipt| receipt.raw_bytes);
+            print_json(&serde_json::json!({
+                "state": if receipt.is_some() { "PRESENT" } else { "ABSENT" },
+                "encoding": "hex",
+                "receipt_bytes_hex": receipt.map(hex::encode),
+            }))?;
+        }
         Command::SealTerminalReceipt { draft } => {
             let mut receipt =
                 nightshift_foreman::TerminalReceiptV1::from_slice(&read_bounded_existing(&draft)?)?;
