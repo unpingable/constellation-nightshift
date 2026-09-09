@@ -44,8 +44,14 @@ check_owner_law() {
     [[ -f "$schema" ]] || return 1
     rg -q '"additionalProperties": false' "$schema" || return 1
   done
-  if rg -n 'std::process::Command|respond_approval|send_approval|automatic_retry|aggregate_result' \
+  if rg -n 'std::process::Command|respond_approval|send_approval|automatic_retry' \
       "$checked_store" "$checked_contract" >/dev/null; then
+    return 1
+  fi
+  # SECOND-WATCH records an explicit nonclaim on its sealed driver step.
+  # Permit only that literal false field, not another aggregate expression.
+  if rg --no-filename 'aggregate_result' "$checked_store" "$checked_contract" \
+      | rg -v '^[[:space:]]*aggregate_result_created: false,[[:space:]]*$' >/dev/null; then
     return 1
   fi
 }
@@ -71,6 +77,14 @@ if [[ "${1:-}" == "--self-test-inject" ]]; then
       "$fixture/schemas/requirement.json" \
       "$fixture/schemas/admission.json"; then
     echo "foreman capacity-admission boundary negative control did not fail"
+    exit 1
+  fi
+  cp "$store" "$fixture/src/store.rs"
+  perl -0pi -e 's/aggregate_result_created: false/aggregate_result_created: true/' \
+    "$fixture/src/store.rs"
+  if check_owner_law "$fixture/src/store.rs" "$fixture/src/contract.rs" \
+      "$fixture/schemas/requirement.json" "$fixture/schemas/admission.json"; then
+    echo "foreman capacity-admission boundary accepted an aggregate assertion"
     exit 1
   fi
   echo "foreman capacity-admission boundary deterministic negative control: passed"
