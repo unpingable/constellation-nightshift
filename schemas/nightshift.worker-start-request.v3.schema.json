@@ -40,8 +40,8 @@
     "provider_admission_binding_schema":{"enum":["switchyard.codex-provider-admission-binding/v1","nightshift.holding-deterministic-provider-admission-evidence/v1","nightshift.holding-deterministic-provider-admission-evidence/v2"]},
     "provider_admission_evidence_schema":{"enum":["switchyard.codex-provider-admission-evidence/v1","nightshift.holding-deterministic-provider-admission-evidence/v1","nightshift.holding-deterministic-provider-admission-evidence/v2"]},
     "provider_admission_snapshot_schema":{"enum":["switchyard.codex-provider-admission-snapshot/v1","nightshift.holding-deterministic-provider-admission-evidence/v1","nightshift.holding-deterministic-provider-admission-evidence/v2"]},
-    "codex_owner_head":{"const":"c36a8137638decf8b04a49611354a90f32c5a945"},
-    "switchyard_owner_head":{"const":"2ba25db66d8b29dd215bd87e05f4ea794024b3b7"},
+    "codex_owner_head":{"enum":["c36a8137638decf8b04a49611354a90f32c5a945","b7495765163ab124f4fba7935a79983eb18c87f9"]},
+    "switchyard_owner_head":{"enum":["2ba25db66d8b29dd215bd87e05f4ea794024b3b7","d61b7192fed93355830d072145886d408e3b8e1e"]},
     "switchyard_schema_sha256":{"const":"sha256:131f1f6e0cf8cb0aea26ed225c584440c81ffedd443c68ace23adecbe493cf93"},
     "switchyard_deterministic_fixture_sha256":{"const":"sha256:cafa673ac58f60029fd6c1de229b4f57d9f42ba918b7ecb2a3bfb20cb2b41a31"},
     "provider_execution_id":{"type":"null"},
@@ -51,6 +51,10 @@
     "authority_effect":{"const":"LOCAL_AGENT_COMPUTE_SCHEDULING_ONLY"}
   },
   "allOf":[
+    {"oneOf":[
+      {"properties":{"codex_owner_head":{"const":"c36a8137638decf8b04a49611354a90f32c5a945"},"switchyard_owner_head":{"const":"2ba25db66d8b29dd215bd87e05f4ea794024b3b7"}}},
+      {"properties":{"codex_owner_head":{"const":"b7495765163ab124f4fba7935a79983eb18c87f9"},"switchyard_owner_head":{"const":"d61b7192fed93355830d072145886d408e3b8e1e"}}}
+    ]},
     {"oneOf":[
       {"properties":{
         "adapter_id":{"not":{"const":"nightshift:holding-pattern-deterministic-fake-adapter"}},

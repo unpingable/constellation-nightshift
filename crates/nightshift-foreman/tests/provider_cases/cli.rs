@@ -9,6 +9,68 @@ fn invoke(args: &[&str]) -> Output {
 }
 
 #[test]
+fn real_snapshot_translation_preserves_existing_owner_graph_and_uncertainty() {
+    for name in [
+        "completed",
+        "parked",
+        "indeterminate",
+        "interrupted",
+        "approval",
+    ] {
+        let (_directory, _path, store, _packet, admission, _profile, policy, requirement) =
+            holding_setup();
+        let opened = store
+            .prepare_provider_attempt(
+                &admission.run_id,
+                "work-a",
+                "derived-dispatch",
+                "derived-process",
+                "derived-session",
+                0,
+                holding_time("2026-08-31T12:00:01Z"),
+            )
+            .unwrap();
+        let received = holding_time("2026-08-31T12:00:02Z");
+        let (raw, expected, expected_observation) =
+            holding_disposition(&requirement, &opened, name, received);
+        let (disposition, observation) = nightshift_foreman::derive_provider_snapshot_evidence(
+            &requirement,
+            &opened.dispatch,
+            &raw,
+            received,
+            received + Duration::seconds(60),
+        )
+        .unwrap();
+        assert_eq!(disposition, expected);
+        assert_eq!(observation, expected_observation);
+        let deferred = disposition
+            .permits_automatic_park()
+            .then(|| holding_deferred(&requirement, &policy, &opened, &disposition));
+        nightshift_foreman::validate_execution_availability_graph(
+            &requirement,
+            &policy,
+            &opened.dispatch,
+            &observation,
+            &disposition,
+            &[],
+            deferred.as_ref(),
+        )
+        .unwrap();
+        let mut substituted = opened.dispatch.clone();
+        substituted.dispatch_occurrence_id = "different-dispatch".to_owned();
+        substituted.seal().unwrap();
+        assert!(nightshift_foreman::derive_provider_snapshot_evidence(
+            &requirement,
+            &substituted,
+            &raw,
+            received,
+            received + Duration::seconds(60),
+        )
+        .is_err());
+    }
+}
+
+#[test]
 fn cli_opens_real_owner_dispatch_and_refuses_duplicate_without_launching() {
     let (directory, path, packet, admission, profile, policy, requirement) =
         holding_fixture_contracts();

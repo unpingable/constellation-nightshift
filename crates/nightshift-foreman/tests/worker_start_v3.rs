@@ -17,6 +17,46 @@ use sha2::{Digest as _, Sha256};
 
 type V3Substitution = Box<dyn Fn(&mut WorkerStartRequestV3)>;
 
+#[test]
+fn explicit_beta_owner_tuple_preserves_requirement_binding_without_fallback() {
+    let profile = profile();
+    let mut requirement = requirement(&profile);
+    requirement.owner_pins = ProviderAdmissionOwnerPinsV1::beta_candidate();
+    requirement.seal().unwrap();
+    let request = WorkerStartRequestV3::from_v2_for_dispatch(
+        &canonical(&v2()),
+        &profile,
+        &requirement,
+        "dispatch-beta-1",
+        0,
+    )
+    .unwrap();
+    assert_eq!(
+        request.codex_owner_head,
+        requirement.owner_pins.codex_owner_head
+    );
+    assert_eq!(
+        request.switchyard_owner_head,
+        requirement.owner_pins.switchyard_owner_head
+    );
+    request
+        .validate_dispatch_graph(&profile, &requirement, &dispatch(&request, &requirement))
+        .unwrap();
+    let mut mixed = request.clone();
+    mixed.switchyard_owner_head = ProviderAdmissionOwnerPinsV1::accepted().switchyard_owner_head;
+    assert!(mixed.seal().is_err() || mixed.validate().is_err());
+    let mut old_requirement = requirement.clone();
+    old_requirement.owner_pins = ProviderAdmissionOwnerPinsV1::accepted();
+    old_requirement.seal().unwrap();
+    assert!(request
+        .validate_dispatch_graph(
+            &profile,
+            &old_requirement,
+            &dispatch(&request, &old_requirement)
+        )
+        .is_err());
+}
+
 fn digest(fill: char) -> String {
     format!("sha256:{}", fill.to_string().repeat(64))
 }

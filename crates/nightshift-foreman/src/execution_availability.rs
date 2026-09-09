@@ -15,6 +15,10 @@ use sha2::{Digest as _, Sha256};
 
 use crate::contract::{ContractError, ExecutionProfileV2, WorkerStartRequestV2};
 
+#[path = "provider_snapshot_translation.rs"]
+mod provider_snapshot_translation;
+pub use provider_snapshot_translation::derive_provider_snapshot_evidence;
+
 pub const EXECUTION_AVAILABILITY_OBSERVATION_SCHEMA_V1: &str =
     "nightshift.provider-execution-availability-observation/v1";
 pub const EXECUTION_AVAILABILITY_POLICY_SCHEMA_V1: &str =
@@ -40,6 +44,9 @@ pub const ACCEPTED_CODEX_PROVIDER_ADMISSION_OWNER_HEAD: &str =
     "c36a8137638decf8b04a49611354a90f32c5a945";
 pub const ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_OWNER_HEAD: &str =
     "2ba25db66d8b29dd215bd87e05f4ea794024b3b7";
+// Explicit integration candidate enrollment; not inherited qualification.
+const BETA_CODEX_OWNER_HEAD: &str = "b7495765163ab124f4fba7935a79983eb18c87f9";
+const BETA_SWITCHYARD_OWNER_HEAD: &str = "d61b7192fed93355830d072145886d408e3b8e1e";
 pub const ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_SHA256: &str =
     "sha256:131f1f6e0cf8cb0aea26ed225c584440c81ffedd443c68ace23adecbe493cf93";
 pub const ACCEPTED_SWITCHYARD_DETERMINISTIC_FIXTURE_SHA256: &str =
@@ -698,6 +705,14 @@ pub struct ProviderAdmissionOwnerPinsV1 {
 }
 
 impl ProviderAdmissionOwnerPinsV1 {
+    /// Exact beta integration candidate; never selected as an automatic fallback.
+    pub fn beta_candidate() -> Self {
+        Self {
+            codex_owner_head: BETA_CODEX_OWNER_HEAD.to_owned(),
+            switchyard_owner_head: BETA_SWITCHYARD_OWNER_HEAD.to_owned(),
+            ..Self::accepted()
+        }
+    }
     pub fn accepted() -> Self {
         Self {
             codex_owner_head: ACCEPTED_CODEX_PROVIDER_ADMISSION_OWNER_HEAD.to_owned(),
@@ -709,7 +724,7 @@ impl ProviderAdmissionOwnerPinsV1 {
         }
     }
     pub fn validate(&self) -> Result<(), ContractError> {
-        if self != &Self::accepted() {
+        if self != &Self::accepted() && self != &Self::beta_candidate() {
             return Err(ContractError::InvalidField("provider admission owner pins"));
         }
         Ok(())
@@ -969,12 +984,13 @@ impl WorkerStartRequestV3 {
             provider_admission_binding_schema: binding_schema.to_owned(),
             provider_admission_evidence_schema: evidence_schema.to_owned(),
             provider_admission_snapshot_schema: snapshot_schema.to_owned(),
-            codex_owner_head: ACCEPTED_CODEX_PROVIDER_ADMISSION_OWNER_HEAD.to_owned(),
-            switchyard_owner_head: ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_OWNER_HEAD.to_owned(),
-            switchyard_schema_sha256: ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_SHA256
-                .to_owned(),
-            switchyard_deterministic_fixture_sha256:
-                ACCEPTED_SWITCHYARD_DETERMINISTIC_FIXTURE_SHA256.to_owned(),
+            codex_owner_head: requirement.owner_pins.codex_owner_head.clone(),
+            switchyard_owner_head: requirement.owner_pins.switchyard_owner_head.clone(),
+            switchyard_schema_sha256: requirement.owner_pins.switchyard_schema_sha256.clone(),
+            switchyard_deterministic_fixture_sha256: requirement
+                .owner_pins
+                .deterministic_fixture_sha256
+                .clone(),
             provider_execution_id: None,
             internal_provider_retry_count: 0,
             semantic_retry: false,
@@ -1026,6 +1042,7 @@ impl WorkerStartRequestV3 {
             .and_then(|selections| selections.get(usize::from(self.selected_model_ordinal)))
             .ok_or(ContractError::InvalidField("V3 selected model ordinal"))?;
         if self.work_attempt_id == self.dispatch_occurrence_id
+            || self.owner_pins() != requirement.owner_pins
             || self.profile_digest != profile.profile_digest
             || self.packet_digest != profile.packet_digest
             || self.packet_digest != requirement.packet_digest
@@ -1240,11 +1257,7 @@ impl WorkerStartRequestV3 {
             || self.model_class != self.provider_model_class
             || self.selected_model_ordinal >= 16
             || !(switchyard_binding || qualification_binding_v1 || qualification_binding_v2)
-            || self.codex_owner_head != ACCEPTED_CODEX_PROVIDER_ADMISSION_OWNER_HEAD
-            || self.switchyard_owner_head != ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_OWNER_HEAD
-            || self.switchyard_schema_sha256 != ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_SHA256
-            || self.switchyard_deterministic_fixture_sha256
-                != ACCEPTED_SWITCHYARD_DETERMINISTIC_FIXTURE_SHA256
+            || self.owner_pins().validate().is_err()
             || self.provider_execution_id.is_some()
             || self.internal_provider_retry_count != 0
             || self.semantic_retry
@@ -1254,6 +1267,15 @@ impl WorkerStartRequestV3 {
             return Err(ContractError::InvalidField("worker start V3 binding"));
         }
         Ok(())
+    }
+
+    fn owner_pins(&self) -> ProviderAdmissionOwnerPinsV1 {
+        ProviderAdmissionOwnerPinsV1 {
+            codex_owner_head: self.codex_owner_head.clone(),
+            switchyard_owner_head: self.switchyard_owner_head.clone(),
+            switchyard_schema_sha256: self.switchyard_schema_sha256.clone(),
+            deterministic_fixture_sha256: self.switchyard_deterministic_fixture_sha256.clone(),
+        }
     }
 }
 
@@ -2005,7 +2027,11 @@ fn validate_switchyard_snapshot(
         "mapper binding closure",
     )?;
     if string(binding, "schema")? != "switchyard.codex-provider-admission-binding/v1"
-        || string(binding, "codex_source_head")? != ACCEPTED_CODEX_PROVIDER_ADMISSION_OWNER_HEAD
+        || ![
+            ACCEPTED_CODEX_PROVIDER_ADMISSION_OWNER_HEAD,
+            BETA_CODEX_OWNER_HEAD,
+        ]
+        .contains(&string(binding, "codex_source_head")?)
         || integer(binding, "internal_provider_request_retries")? != 0
         || canonical_value_digest(
             binding,
@@ -4452,6 +4478,17 @@ pub fn validate_execution_availability_graph(
     dispatch.validate()?;
     observation.validate()?;
     disposition.validate()?;
+    if disposition.mapper_snapshot_schema == "switchyard.codex-provider-admission-snapshot/v1" {
+        let snapshot: Value =
+            serde_json::from_slice(&disposition.mapper_snapshot.validate()?).map_err(json_error)?;
+        if snapshot["binding"]["codex_source_head"].as_str()
+            != Some(requirement.owner_pins.codex_owner_head.as_str())
+        {
+            return Err(ContractError::InvalidField(
+                "requirement mapper owner graph",
+            ));
+        }
+    }
     if requirement.admitted_at > dispatch.opened_at
         || dispatch.opened_at > disposition.received_at
         || requirement.policy_id != policy.policy_id

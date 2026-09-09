@@ -9,11 +9,15 @@ use anyhow::{Context as _, Result};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use nightshift_foreman::{
-    ExecutionProfileV2, ForemanAdmissionV1, ForemanStore, ProviderDispositionEvidenceV1,
-    SelfHostedBootstrapInputsV1,
+    derive_provider_snapshot_evidence, ExecutionProfileV2, ForemanAdmissionV1,
+    ForemanExecutionAvailabilityRequirementV1, ForemanStore, ProviderDispatchOccurrenceV1,
+    ProviderDispositionEvidenceV1, SelfHostedBootstrapInputsV1,
 };
 
 const MAXIMUM_BOOTSTRAP_INPUT_BYTES: u64 = 16 * 1024 * 1024;
+
+#[path = "../provider_cli_inputs.rs"]
+mod provider_cli_inputs;
 
 #[derive(Parser)]
 #[command(
@@ -27,6 +31,24 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Translate retained mapper evidence; store admission remains a separate gate.
+    ProviderDeriveEvidence {
+        #[arg(long)]
+        requirement: PathBuf,
+        #[arg(long)]
+        dispatch: PathBuf,
+        #[arg(long)]
+        snapshot: PathBuf,
+        #[arg(long)]
+        received_at: String,
+        #[arg(long)]
+        expires_at: String,
+    },
+    /// Canonicalize operator-authored contracts; does not admit or launch work.
+    ProviderSealInputs {
+        #[arg(long)]
+        draft: PathBuf,
+    },
     /// Admit exact existing provider-mechanism contracts; grants no target authority.
     ProviderAdmit {
         #[arg(long)]
@@ -233,6 +255,32 @@ enum Command {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
+        Command::ProviderDeriveEvidence {
+            requirement,
+            dispatch,
+            snapshot,
+            received_at,
+            expires_at,
+        } => {
+            let requirement = ForemanExecutionAvailabilityRequirementV1::from_slice(
+                &read_bounded_existing(&requirement)?,
+            )?;
+            let dispatch =
+                ProviderDispatchOccurrenceV1::from_slice(&read_bounded_existing(&dispatch)?)?;
+            let (disposition, observation) = derive_provider_snapshot_evidence(
+                &requirement,
+                &dispatch,
+                &read_bounded_existing(&snapshot)?,
+                instant(&received_at)?,
+                instant(&expires_at)?,
+            )?;
+            print_json(
+                &serde_json::json!({"disposition": disposition, "observation": observation}),
+            )?;
+        }
+        Command::ProviderSealInputs { draft } => {
+            write_raw(&provider_cli_inputs::seal(&read_bounded_existing(&draft)?)?)?;
+        }
         Command::ProviderAdmit {
             db,
             packet,
