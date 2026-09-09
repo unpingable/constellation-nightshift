@@ -169,7 +169,11 @@ fn mapper_fixture_family(final_pair: bool) {
             )
             .unwrap();
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join(if final_pair { "../../qualification/operator-beta-provider-20260908/final-fixtures" } else { "../../qualification/operator-beta-provider-20260908/fixtures" })
+            .join(if final_pair {
+                "../../qualification/operator-beta-provider-20260908/final-fixtures"
+            } else {
+                "../../qualification/operator-beta-provider-20260908/fixtures"
+            })
             .join(format!("{name}.json"));
         let snapshot: Value = serde_json::from_slice(&fs::read(fixture).unwrap()).unwrap();
         let raw = holding_retarget_snapshot(snapshot, &opened);

@@ -48,8 +48,11 @@ pub const ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_OWNER_HEAD: &str =
 // Explicit integration candidate enrollment; not inherited qualification.
 const FINAL_CODEX_OWNER_HEAD: &str = "97b0acd5ce2ccb3c87a763606696c35a450947f6";
 const FINAL_SWITCHYARD_OWNER_HEAD: &str = "4f85615ef6ebe5483ab96afe6e046b4ea10566c6";
-const FINAL_SWITCHYARD_SCHEMA_SHA256: &str = "sha256:0e9c851cc9fad9538408ab44d84737d5f4d4d7ef39f2fd5db20c6f88fc7fbb9e";
-const FINAL_SWITCHYARD_SCHEMA_BYTES: &[u8] = include_bytes!("../../../schemas/vendor/switchyard.codex-provider-admission.beta-final.v1.schema.json");
+const FINAL_SWITCHYARD_SCHEMA_SHA256: &str =
+    "sha256:0e9c851cc9fad9538408ab44d84737d5f4d4d7ef39f2fd5db20c6f88fc7fbb9e";
+const FINAL_SWITCHYARD_SCHEMA_BYTES: &[u8] = include_bytes!(
+    "../../../schemas/vendor/switchyard.codex-provider-admission.beta-final.v1.schema.json"
+);
 const BETA_CODEX_OWNER_HEAD: &str = "6893ae42233aa95b1c1623497405681d99a589da";
 const BETA_SWITCHYARD_OWNER_HEAD: &str = "2207bb6ca19690a2c218fffe6c69e429eee24eb5";
 pub const ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_SHA256: &str =
@@ -745,7 +748,10 @@ impl ProviderAdmissionOwnerPinsV1 {
         }
     }
     pub fn validate(&self) -> Result<(), ContractError> {
-        if self != &Self::accepted() && self != &Self::beta_candidate() && self != &Self::final_beta_candidate() {
+        if self != &Self::accepted()
+            && self != &Self::beta_candidate()
+            && self != &Self::final_beta_candidate()
+        {
             return Err(ContractError::InvalidField("provider admission owner pins"));
         }
         Ok(())
@@ -2283,7 +2289,10 @@ fn validate_vendored_switchyard_schema(instance: &Value) -> Result<(), ContractE
             SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_BYTES,
             ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_SHA256,
         ),
-        Some(FINAL_CODEX_OWNER_HEAD) => (FINAL_SWITCHYARD_SCHEMA_BYTES, FINAL_SWITCHYARD_SCHEMA_SHA256),
+        Some(FINAL_CODEX_OWNER_HEAD) => (
+            FINAL_SWITCHYARD_SCHEMA_BYTES,
+            FINAL_SWITCHYARD_SCHEMA_SHA256,
+        ),
         Some(BETA_CODEX_OWNER_HEAD) => {
             (BETA_SWITCHYARD_SCHEMA_BYTES, BETA_SWITCHYARD_SCHEMA_SHA256)
         }
