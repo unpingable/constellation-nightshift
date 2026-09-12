@@ -403,6 +403,13 @@ fn retained_completion_safe_evaluation_at(
         + chrono::Duration::milliseconds(2_025)
 }
 
+fn within_evidence_horizon(observed_at_ms: u64, evaluated_at_ms: u64, max_age_ms: u64) -> bool {
+    observed_at_ms <= evaluated_at_ms
+        && observed_at_ms
+            .checked_add(max_age_ms)
+            .is_some_and(|fresh_until| evaluated_at_ms < fresh_until)
+}
+
 #[test]
 fn retained_completion_waits_past_a_new_slot_boundary() {
     let first_due = DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
@@ -415,6 +422,14 @@ fn retained_completion_waits_past_a_new_slot_boundary() {
         boundary + chrono::Duration::milliseconds(2_025)
     );
     assert!(boundary < retained_completion_safe_evaluation_at(first_due, 3, 60));
+}
+
+#[test]
+fn successor_evaluation_must_follow_capture_within_its_horizon() {
+    assert!(!within_evidence_horizon(100, 99, 5));
+    assert!(within_evidence_horizon(100, 100, 5));
+    assert!(within_evidence_horizon(100, 104, 5));
+    assert!(!within_evidence_horizon(100, 105, 5));
 }
 
 fn next_unused_scheduled_occurrence(
@@ -3213,7 +3228,17 @@ fn synthetic_cache_design_qualifies_and_tears_down_through_governed_runtime() {
             &stale_basis_path,
             &serde_json::to_value(&stale_basis).unwrap(),
         );
+        let (diagnostic_occurrence, retained_completion_evaluated_at) =
+            next_unused_scheduled_occurrence(
+                &store,
+                feedback_first_due,
+                clean_recurrence.obligations[0].policy.cadence_seconds,
+            );
         let passive_s2 = run_passive("orchestrate-reobserve-after-stale", &stale_basis_path);
+        let s2_observed_at = passive_s2
+            .pointer("/evidence/handoff/observation/observed_at_unix_ms")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap();
         let s2_observation_id = passive_s2
             .pointer("/evidence/handoff/observation/observation_id")
             .and_then(serde_json::Value::as_str)
@@ -3231,16 +3256,19 @@ fn synthetic_cache_design_qualifies_and_tears_down_through_governed_runtime() {
         write_jcs(&root.join("passive-acquisition-s1.json"), &passive_s1);
         write_jcs(&root.join("passive-acquisition-s2.json"), &passive_s2);
 
-        let successor_evaluated_at = Utc::now() + chrono::Duration::milliseconds(10);
-        let diagnostic_occurrence = scheduled_occurrence_at(
-            feedback_first_due,
-            successor_evaluated_at,
-            clean_recurrence.obligations[0].policy.cadence_seconds,
+        let successor_evaluated_at = Utc::now();
+        assert!(
+            within_evidence_horizon(
+                s2_observed_at,
+                u64::try_from(successor_evaluated_at.timestamp_millis()).unwrap(),
+                steady_profile.max_age_ms,
+            ),
+            "fresh S2 must retain time for the successor cycle"
         );
         let (next_policy, next_inputs, next_recurrence) = fresh_policy_inputs_recurrence(
             feedback_first_due,
             diagnostic_occurrence,
-            successor_evaluated_at - chrono::Duration::seconds(1),
+            retained_completion_evaluated_at - chrono::Duration::seconds(1),
         );
         assert_eq!(next_policy.policy_id, policy.policy_id);
         let mut successor_base = request_for_precompiled_fresh(
@@ -3796,6 +3824,18 @@ fn synthetic_cache_design_qualifies_and_tears_down_through_governed_runtime() {
     );
     drop(q2_store);
 
+    // Select and enter the successor recurrence slot before acquiring S3.
+    // Otherwise a boundary wait consumes the deliberately short S3 evidence
+    // horizon before AG can evaluate the resulting observation.
+    let (c2_successor_diagnostic_occurrence, retained_completion_evaluated_at) = {
+        let c2_store = CanonicalStore::open(&ns_database).unwrap();
+        next_unused_scheduled_occurrence(
+            &c2_store,
+            feedback_first_due,
+            clean_recurrence.obligations[0].policy.cadence_seconds,
+        )
+    };
+
     let s3_output = Command::new(std::env::var_os("MAUDE_PYTHON").unwrap())
         .args([
             "-m",
@@ -3861,20 +3901,30 @@ fn synthetic_cache_design_qualifies_and_tears_down_through_governed_runtime() {
         &s3_acquisition,
     );
 
+    let s3_observed_at = s3_acquisition
+        .pointer("/evidence/handoff/observation/observed_at_unix_ms")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap();
+    let c2_successor_evaluated_at = Utc::now();
+    let c2_successor_evaluated_at_ms =
+        u64::try_from(c2_successor_evaluated_at.timestamp_millis()).unwrap();
+    assert!(
+        within_evidence_horizon(
+            s3_observed_at,
+            c2_successor_evaluated_at_ms,
+            c2_steady_profile.max_age_ms,
+        ),
+        "fresh S3 must retain time for the successor cycle"
+    );
+
     // Current C2-looking S3 still cannot make Q1 applicable. Only Q2+S3 can
     // prepare the exact C2 routine-continuation proposal.
     let c2_store = CanonicalStore::open(&ns_database).unwrap();
-    let (c2_successor_diagnostic_occurrence, c2_successor_evaluated_at) =
-        next_unused_scheduled_occurrence(
-            &c2_store,
-            feedback_first_due,
-            clean_recurrence.obligations[0].policy.cadence_seconds,
-        );
     let (c2_successor_policy, c2_successor_inputs, c2_successor_recurrence) =
         fresh_policy_inputs_recurrence(
             feedback_first_due,
             c2_successor_diagnostic_occurrence,
-            c2_successor_evaluated_at - chrono::Duration::seconds(1),
+            retained_completion_evaluated_at - chrono::Duration::seconds(1),
         );
     let mut c2_successor_base = request_for_precompiled_fresh(
         &c2_successor_policy,
