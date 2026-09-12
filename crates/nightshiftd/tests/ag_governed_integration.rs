@@ -389,6 +389,34 @@ fn scheduled_occurrence_at(
     u64::try_from(elapsed_ms / cadence_ms).unwrap()
 }
 
+fn retained_completion_safe_evaluation_at(
+    first_due: DateTime<Utc>,
+    occurrence: u64,
+    cadence_seconds: u64,
+) -> DateTime<Utc> {
+    let occurrence_seconds = occurrence
+        .checked_mul(cadence_seconds)
+        .and_then(|seconds| i64::try_from(seconds).ok())
+        .unwrap();
+    first_due
+        + chrono::Duration::seconds(occurrence_seconds)
+        + chrono::Duration::milliseconds(2_025)
+}
+
+#[test]
+fn retained_completion_waits_past_a_new_slot_boundary() {
+    let first_due = DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    let boundary = first_due + chrono::Duration::seconds(180);
+    assert_eq!(scheduled_occurrence_at(first_due, boundary, 60), 3);
+    assert_eq!(
+        retained_completion_safe_evaluation_at(first_due, 3, 60),
+        boundary + chrono::Duration::milliseconds(2_025)
+    );
+    assert!(boundary < retained_completion_safe_evaluation_at(first_due, 3, 60));
+}
+
 fn next_unused_scheduled_occurrence(
     store: &CanonicalStore,
     first_due: DateTime<Utc>,
@@ -404,16 +432,28 @@ fn next_unused_scheduled_occurrence(
         let evaluated_at = Utc::now() + chrono::Duration::milliseconds(20);
         let wall_clock_occurrence =
             scheduled_occurrence_at(first_due, evaluated_at, cadence_seconds);
-        if last_persisted.is_none_or(|persisted| wall_clock_occurrence > persisted) {
+        let wall_clock_safe_at = retained_completion_safe_evaluation_at(
+            first_due,
+            wall_clock_occurrence,
+            cadence_seconds,
+        );
+        if last_persisted.is_none_or(|persisted| wall_clock_occurrence > persisted)
+            && evaluated_at >= wall_clock_safe_at
+        {
             return (wall_clock_occurrence, evaluated_at);
         }
-        let next_occurrence = last_persisted.unwrap() + 1;
-        let next_due = first_due
-            + chrono::Duration::seconds(i64::try_from(next_occurrence * cadence_seconds).unwrap());
+        let next_occurrence = last_persisted
+            .map(|persisted| persisted + 1)
+            .unwrap_or(wall_clock_occurrence);
+        let safe_at = retained_completion_safe_evaluation_at(
+            first_due,
+            next_occurrence.max(wall_clock_occurrence),
+            cadence_seconds,
+        );
         // The retained diagnostic completion starts two seconds before the
         // evaluation instant. Enter the new slot far enough past its exact
         // due boundary that the whole retained attempt remains in-slot.
-        let wait_ms = (next_due - Utc::now()).num_milliseconds().max(0) + 2_025;
+        let wait_ms = (safe_at - Utc::now()).num_milliseconds().max(1);
         std::thread::sleep(std::time::Duration::from_millis(
             u64::try_from(wait_ms).unwrap(),
         ));
