@@ -12,10 +12,20 @@ store, and protocol names remain unchanged.
 ## Public main: source build and inspection
 
 This branch is a source workspace, not an installed package. It requires Git,
-Rust 1.82 or newer, a native C compiler/linker for bundled SQLite, and sibling
-`wicket` and `wlp` source trees at the relative paths declared in `Cargo.toml`.
-Its first dependency resolution may need crates.io access unless the required
-Cargo material is already available.
+Rust 1.82 or newer, a native C compiler/linker for bundled SQLite, and public
+Wicket and WLP source checkouts beside the Nightshift checkout. Acquire those
+three public repositories together; no local private sibling is implied:
+
+```sh
+git clone https://github.com/unpingable/constellation-nightshift.git nightshift
+git clone https://github.com/unpingable/wicket.git wicket
+git clone https://github.com/unpingable/wlp.git wlp
+```
+
+The directory names and placement are load-bearing because `Cargo.toml` names
+`../wicket` and `../wlp`. Keep revisions compatible with the checked-out
+Nightshift source. Its first dependency resolution may need crates.io access
+unless the required Cargo material is already available.
 
 ```sh
 cargo build --locked --release
