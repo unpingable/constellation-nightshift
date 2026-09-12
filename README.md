@@ -1,5 +1,8 @@
 # Night Shift
 
+New here? Read the [Nightshift newcomer guide](docs/PUBLIC_GUIDE.md) for the
+public-main source-build, read-only inspection, and qualification boundaries.
+
 Deferred agent work with receipts, reconciliation, and governed promotion.
 
 > Let agents work late without giving them the keys.

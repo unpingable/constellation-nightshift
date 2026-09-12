@@ -154,3 +154,17 @@ Ask for clarification rather than guessing, especially around:
 | Claude Code | `CLAUDE.md` | Full operational context, build details, conventions |
 | Codex | `AGENTS.md` (this file) | Operating context + defaults |
 | Any future agent | `AGENTS.md` (this file) | Start here |
+
+## Campaign selection
+
+Use Nightshift when recurrence, currentness, durable observation history, or
+restart-safe proposal tracking matters; keep bounded edits on the ordinary
+repository workflow. Start with `cargo run --bin nightshift -- --help` and
+`docs/operator/README.md`. A composed run requires its exact, owner-approved
+NQ and authority coordinates.
+
+For prolonged work, use the campaign-approved durable producer and checkpoint.
+After supervisor interruption, inspect the original cycle and its owning
+occurrence before requesting a successor. Tool availability, recurrence, or a
+proposal grants no authority. If the composed path is unavailable, use the
+documented fallback and state the evidence limit.
