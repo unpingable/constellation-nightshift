@@ -1,0 +1,422 @@
+{
+  "schema": "switchyard.bounded-turn-echo-vector/v1",
+  "qualification": "SYNTHETIC_NO_PROVIDER_CONTACT",
+  "turn_start_wire_bytes": 118500,
+  "turn_start_fill": "S",
+  "agent_output_utf8_bytes": 32768,
+  "agent_output_fill": "\\u0000",
+  "expected_snapshot_digest": "sha256:2c1cc7763a5cbb3d5d74f80b84da7613836c1c648967b76cd98123107477c5b2",
+  "compact_snapshot": {
+    "schema": "switchyard.codex-provider-admission-snapshot/v1",
+    "snapshot_digest": "sha256:9e35d6dc6f1cccd62225f58ab496a8b989c99ec93e27e40cfcc2601d7c51e015",
+    "binding": {
+      "work_attempt_id": "echo-vector-attempt",
+      "dispatch_occurrence_id": "echo-vector-dispatch",
+      "adapter_process_occurrence_id": "echo-vector-process",
+      "app_server_session_identity": "echo-vector-session",
+      "thread_id": "echo-vector-thread",
+      "turn_id": "echo-vector-turn",
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "codex_source_head": "97b0acd5ce2ccb3c87a763606696c35a450947f6",
+      "executable_kind": "DETERMINISTIC_FIXTURE",
+      "app_server_executable_identity": "generic-echo-vector-not-a-provider",
+      "app_server_executable_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "internal_provider_request_retries": 0,
+      "schema": "switchyard.codex-provider-admission-binding/v1",
+      "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55"
+    },
+    "admission_disposition": "EXECUTION_ADMITTED",
+    "mechanism_state": "PROVIDER_COMPLETED",
+    "provider_execution_identity": {
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "app_server_session_identity": "echo-vector-session",
+      "thread_id": "echo-vector-thread",
+      "turn_id": "echo-vector-turn",
+      "first_response_id": "echo-vector-response"
+    },
+    "acquisition_cut": {
+      "adapter_process_occurrence_id": "echo-vector-process",
+      "app_server_session_identity": "echo-vector-session",
+      "stream_quiesced": true,
+      "loss_generation": 0,
+      "process_disposition": "EXITED",
+      "ordered_high_water": 11,
+      "consumed_ordinal_count": 11,
+      "outstanding_client_request_count": 0,
+      "clean": true
+    },
+    "records": [
+      {
+        "schema": "switchyard.codex-provider-admission-evidence/v1",
+        "evidence_digest": "sha256:b95bc99e260bb9ace9de90ed74a04bd8042e315b429030fce32590fa50d4bfc0",
+        "sequence": 0,
+        "acquisition_ordinal": 0,
+        "acquisition_kind": "CLIENT_REQUEST",
+        "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55",
+        "work_attempt_id": "echo-vector-attempt",
+        "dispatch_occurrence_id": "echo-vector-dispatch",
+        "adapter_process_occurrence_id": "echo-vector-process",
+        "app_server_session_identity": "echo-vector-session",
+        "thread_id": "echo-vector-thread",
+        "turn_id": "echo-vector-turn",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "kind": "CLIENT_REQUEST_ISSUED",
+        "method": "client-request/turn/start",
+        "normalized": {
+          "request_id": 3,
+          "request_method": "turn/start",
+          "params_sha256": "sha256:f4c795056d93ba7ed97d5d526c6f74b4d72a8b109896b2660ff8ca841e06ce72",
+          "proves_provider_admission": false
+        },
+        "raw": {
+          "representation": "EXACT_WIRE_BYTES_INCLUDING_LINE_TERMINATOR",
+          "byte_length": 134,
+          "sha256": "sha256:06f7a9b89590a86e1282ada980f51d6eeaaf2f427986568ab0b5d112b0ebc370",
+          "encoding": "hex",
+          "bytes_hex": "7b226964223a332c226d6574686f64223a227475726e2f7374617274222c22706172616d73223a7b227468726561644964223a226563686f2d766563746f722d746872656164222c226d6f64656c223a226770742d352e362d7465727261222c22696e707574223a5b7b2274797065223a2274657874222c2274657874223a22227d5d7d7d0a"
+        }
+      },
+      {
+        "schema": "switchyard.codex-provider-admission-evidence/v1",
+        "evidence_digest": "sha256:dd2e6e5885b68d0a753e205ae44edee463e1e626faf060551647b50947fafd81",
+        "sequence": 1,
+        "acquisition_ordinal": 1,
+        "acquisition_kind": "CLIENT_RESPONSE",
+        "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55",
+        "work_attempt_id": "echo-vector-attempt",
+        "dispatch_occurrence_id": "echo-vector-dispatch",
+        "adapter_process_occurrence_id": "echo-vector-process",
+        "app_server_session_identity": "echo-vector-session",
+        "thread_id": "echo-vector-thread",
+        "turn_id": "echo-vector-turn",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "kind": "CLIENT_RESPONSE_RETAINED",
+        "method": "client-response/turn/start",
+        "normalized": {
+          "request_id": 3,
+          "request_method": "turn/start",
+          "params_sha256": "sha256:f4c795056d93ba7ed97d5d526c6f74b4d72a8b109896b2660ff8ca841e06ce72",
+          "result_sha256": "sha256:0921d4b3488a76759b4923a6ff3b3c4e344f8a2f9076d3afe6607a0010d47d42",
+          "proves_provider_admission": false
+        },
+        "raw": {
+          "representation": "EXACT_WIRE_BYTES_INCLUDING_LINE_TERMINATOR",
+          "byte_length": 53,
+          "sha256": "sha256:f9015240048afb92ba458e22180df3002ec743d798055300d19943d174b31e98",
+          "encoding": "hex",
+          "bytes_hex": "7b226964223a332c22726573756c74223a7b227475726e223a7b226964223a226563686f2d766563746f722d7475726e227d7d7d0a"
+        }
+      },
+      {
+        "schema": "switchyard.codex-provider-admission-evidence/v1",
+        "evidence_digest": "sha256:bea0b8d3c3bea8ae6589135a7794b0c1c05c25571d55b1abf4534ccb0c125304",
+        "sequence": 2,
+        "acquisition_ordinal": 2,
+        "acquisition_kind": "NOTIFICATION",
+        "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55",
+        "work_attempt_id": "echo-vector-attempt",
+        "dispatch_occurrence_id": "echo-vector-dispatch",
+        "adapter_process_occurrence_id": "echo-vector-process",
+        "app_server_session_identity": "echo-vector-session",
+        "thread_id": "echo-vector-thread",
+        "turn_id": "echo-vector-turn",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "kind": "ACQUISITION_WATERMARK",
+        "method": "item/started",
+        "normalized": {
+          "proves_provider_admission": false
+        },
+        "raw": {
+          "representation": "EXACT_WIRE_BYTES_INCLUDING_LINE_TERMINATOR",
+          "byte_length": 240,
+          "sha256": "sha256:a1217bc93d67129abf0466045232a17a20d53ad339506bcb701b85e1a12ecce4",
+          "encoding": "hex",
+          "bytes_hex": "7b226d6574686f64223a226974656d2f73746172746564222c22706172616d73223a7b227468726561644964223a226563686f2d766563746f722d746872656164222c227475726e4964223a226563686f2d766563746f722d7475726e222c226974656d223a7b2274797065223a22757365724d657373616765222c226964223a226563686f2d766563746f722d75736572222c22636c69656e744964223a6e756c6c2c22636f6e74656e74223a5b7b2274797065223a2274657874222c2274657874223a22222c22746578745f656c656d656e7473223a5b5d7d5d7d2c227374617274656441744d73223a317d7d0a"
+        }
+      },
+      {
+        "schema": "switchyard.codex-provider-admission-evidence/v1",
+        "evidence_digest": "sha256:4ba46f0166400b76642169de9dc8b247e8d89af19c01943324ce1873f6ec6598",
+        "sequence": 3,
+        "acquisition_ordinal": 3,
+        "acquisition_kind": "NOTIFICATION",
+        "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55",
+        "work_attempt_id": "echo-vector-attempt",
+        "dispatch_occurrence_id": "echo-vector-dispatch",
+        "adapter_process_occurrence_id": "echo-vector-process",
+        "app_server_session_identity": "echo-vector-session",
+        "thread_id": "echo-vector-thread",
+        "turn_id": "echo-vector-turn",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "kind": "ACQUISITION_WATERMARK",
+        "method": "item/completed",
+        "normalized": {
+          "proves_provider_admission": false
+        },
+        "raw": {
+          "representation": "EXACT_WIRE_BYTES_INCLUDING_LINE_TERMINATOR",
+          "byte_length": 244,
+          "sha256": "sha256:3cd4a1247fe668ec723e450144b0ba71371c61fa63ecdb08f90f753e2f747090",
+          "encoding": "hex",
+          "bytes_hex": "7b226d6574686f64223a226974656d2f636f6d706c65746564222c22706172616d73223a7b227468726561644964223a226563686f2d766563746f722d746872656164222c227475726e4964223a226563686f2d766563746f722d7475726e222c226974656d223a7b2274797065223a22757365724d657373616765222c226964223a226563686f2d766563746f722d75736572222c22636c69656e744964223a6e756c6c2c22636f6e74656e74223a5b7b2274797065223a2274657874222c2274657874223a22222c22746578745f656c656d656e7473223a5b5d7d5d7d2c22636f6d706c6574656441744d73223a327d7d0a"
+        }
+      },
+      {
+        "schema": "switchyard.codex-provider-admission-evidence/v1",
+        "evidence_digest": "sha256:afbacb13d59b5a9997c8527f9f5d1bd2d33595bdbd62939b4c049ee912b10443",
+        "sequence": 4,
+        "acquisition_ordinal": 4,
+        "acquisition_kind": "NOTIFICATION",
+        "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55",
+        "work_attempt_id": "echo-vector-attempt",
+        "dispatch_occurrence_id": "echo-vector-dispatch",
+        "adapter_process_occurrence_id": "echo-vector-process",
+        "app_server_session_identity": "echo-vector-session",
+        "thread_id": "echo-vector-thread",
+        "turn_id": "echo-vector-turn",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "kind": "PROVIDER_REQUEST_STARTED",
+        "method": "providerRequest/started",
+        "normalized": {
+          "request_occurrence_id": "echo-vector-request",
+          "sampling_ordinal": 0,
+          "request_order": 0,
+          "started_at_ms": 3,
+          "proves_provider_admission": false
+        },
+        "raw": {
+          "representation": "EXACT_WIRE_BYTES_INCLUDING_LINE_TERMINATOR",
+          "byte_length": 249,
+          "sha256": "sha256:281e75b2b606ea1fc05cd4a5ca35fff63a50a103f486e95ed5cfcd53da6a4797",
+          "encoding": "hex",
+          "bytes_hex": "7b226d6574686f64223a2270726f7669646572526571756573742f73746172746564222c22706172616d73223a7b227468726561644964223a226563686f2d766563746f722d746872656164222c227475726e4964223a226563686f2d766563746f722d7475726e222c22726571756573744f6363757272656e63654964223a226563686f2d766563746f722d72657175657374222c2273616d706c696e674f7264696e616c223a302c22726571756573744f72646572223a302c2270726f7669646572223a226f70656e6169222c226d6f64656c223a226770742d352e362d7465727261222c227374617274656441744d73223a337d7d0a"
+        }
+      },
+      {
+        "schema": "switchyard.codex-provider-admission-evidence/v1",
+        "evidence_digest": "sha256:14d5f6e1dee6509b0760e40eb3d84fe5e5ab2adb5fd2e3dbe41b4a8a66f72766",
+        "sequence": 5,
+        "acquisition_ordinal": 5,
+        "acquisition_kind": "NOTIFICATION",
+        "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55",
+        "work_attempt_id": "echo-vector-attempt",
+        "dispatch_occurrence_id": "echo-vector-dispatch",
+        "adapter_process_occurrence_id": "echo-vector-process",
+        "app_server_session_identity": "echo-vector-session",
+        "thread_id": "echo-vector-thread",
+        "turn_id": "echo-vector-turn",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "kind": "PROVIDER_EXECUTION_STEP",
+        "method": "rawResponse/started",
+        "normalized": {
+          "provider_execution_identity": {
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "app_server_session_identity": "echo-vector-session",
+            "thread_id": "echo-vector-thread",
+            "turn_id": "echo-vector-turn",
+            "first_response_id": "echo-vector-response"
+          },
+          "provider_execution_step_identity": {
+            "provider": "openai",
+            "model": "gpt-5.6-terra",
+            "thread_id": "echo-vector-thread",
+            "turn_id": "echo-vector-turn",
+            "request_occurrence_id": "echo-vector-request",
+            "sampling_ordinal": 0,
+            "request_order": 0,
+            "response_id": "echo-vector-response"
+          },
+          "first_admission_boundary": true,
+          "observed_at_ms": 4
+        },
+        "raw": {
+          "representation": "EXACT_WIRE_BYTES_INCLUDING_LINE_TERMINATOR",
+          "byte_length": 282,
+          "sha256": "sha256:1008d355b3fac1f6cde818d61212ab80cf03598abd1096075c074690b7971636",
+          "encoding": "hex",
+          "bytes_hex": "7b226d6574686f64223a22726177526573706f6e73652f73746172746564222c22706172616d73223a7b227468726561644964223a226563686f2d766563746f722d746872656164222c227475726e4964223a226563686f2d766563746f722d7475726e222c22726571756573744f6363757272656e63654964223a226563686f2d766563746f722d72657175657374222c2273616d706c696e674f7264696e616c223a302c22726571756573744f72646572223a302c2270726f7669646572223a226f70656e6169222c226d6f64656c223a226770742d352e362d7465727261222c22726573706f6e73654964223a226563686f2d766563746f722d726573706f6e7365222c226f6273657276656441744d73223a347d7d0a"
+        }
+      },
+      {
+        "schema": "switchyard.codex-provider-admission-evidence/v1",
+        "evidence_digest": "sha256:eb637725075648adccab398057021beccbac95882296ecf38fb87c6197ebcff2",
+        "sequence": 6,
+        "acquisition_ordinal": 6,
+        "acquisition_kind": "NOTIFICATION",
+        "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55",
+        "work_attempt_id": "echo-vector-attempt",
+        "dispatch_occurrence_id": "echo-vector-dispatch",
+        "adapter_process_occurrence_id": "echo-vector-process",
+        "app_server_session_identity": "echo-vector-session",
+        "thread_id": "echo-vector-thread",
+        "turn_id": "echo-vector-turn",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "kind": "PROVIDER_RESPONSE_COMPLETED",
+        "method": "rawResponse/completed",
+        "normalized": {
+          "response_id": "echo-vector-response",
+          "proves_new_admission": false
+        },
+        "raw": {
+          "representation": "EXACT_WIRE_BYTES_INCLUDING_LINE_TERMINATOR",
+          "byte_length": 155,
+          "sha256": "sha256:52604e0603d816bfddf23c469ef2792ed41e2431a73b43d8eef1f9814897050e",
+          "encoding": "hex",
+          "bytes_hex": "7b226d6574686f64223a22726177526573706f6e73652f636f6d706c65746564222c22706172616d73223a7b227468726561644964223a226563686f2d766563746f722d746872656164222c227475726e4964223a226563686f2d766563746f722d7475726e222c22726573706f6e73654964223a226563686f2d766563746f722d726573706f6e7365222c227573616765223a6e756c6c7d7d0a"
+        }
+      },
+      {
+        "schema": "switchyard.codex-provider-admission-evidence/v1",
+        "evidence_digest": "sha256:ac83cb33650ecccc13a291ec79db708a2a7396a25590daba3a8de73b0bd73692",
+        "sequence": 7,
+        "acquisition_ordinal": 7,
+        "acquisition_kind": "NOTIFICATION",
+        "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55",
+        "work_attempt_id": "echo-vector-attempt",
+        "dispatch_occurrence_id": "echo-vector-dispatch",
+        "adapter_process_occurrence_id": "echo-vector-process",
+        "app_server_session_identity": "echo-vector-session",
+        "thread_id": "echo-vector-thread",
+        "turn_id": "echo-vector-turn",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "kind": "ACQUISITION_WATERMARK",
+        "method": "item/started",
+        "normalized": {
+          "proves_provider_admission": false
+        },
+        "raw": {
+          "representation": "EXACT_WIRE_BYTES_INCLUDING_LINE_TERMINATOR",
+          "byte_length": 240,
+          "sha256": "sha256:b8ebb50f92443a80c291cd9c4d32db8d052863b161d021323e6e4d2725962935",
+          "encoding": "hex",
+          "bytes_hex": "7b226d6574686f64223a226974656d2f73746172746564222c22706172616d73223a7b227468726561644964223a226563686f2d766563746f722d746872656164222c227475726e4964223a226563686f2d766563746f722d7475726e222c226974656d223a7b2274797065223a226167656e744d657373616765222c226964223a226563686f2d766563746f722d6167656e74222c2274657874223a22222c227068617365223a2266696e616c5f616e73776572222c226d656d6f72794369746174696f6e223a6e756c6c2c2264656c6976657279223a6e756c6c7d2c227374617274656441744d73223a357d7d0a"
+        }
+      },
+      {
+        "schema": "switchyard.codex-provider-admission-evidence/v1",
+        "evidence_digest": "sha256:8114684c0251617733c10748650145f6767a9b7497a4fe84360cb1b4f409857f",
+        "sequence": 8,
+        "acquisition_ordinal": 8,
+        "acquisition_kind": "NOTIFICATION",
+        "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55",
+        "work_attempt_id": "echo-vector-attempt",
+        "dispatch_occurrence_id": "echo-vector-dispatch",
+        "adapter_process_occurrence_id": "echo-vector-process",
+        "app_server_session_identity": "echo-vector-session",
+        "thread_id": "echo-vector-thread",
+        "turn_id": "echo-vector-turn",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "kind": "ACQUISITION_WATERMARK",
+        "method": "item/agentMessage/delta",
+        "normalized": {
+          "proves_provider_admission": false
+        },
+        "raw": {
+          "representation": "EXACT_WIRE_BYTES_INCLUDING_LINE_TERMINATOR",
+          "byte_length": 148,
+          "sha256": "sha256:796a4203d70cf4f4e2ed87ab409077e532807b97346d6036ec5f7a25f3ca5389",
+          "encoding": "hex",
+          "bytes_hex": "7b226d6574686f64223a226974656d2f6167656e744d6573736167652f64656c7461222c22706172616d73223a7b227468726561644964223a226563686f2d766563746f722d746872656164222c227475726e4964223a226563686f2d766563746f722d7475726e222c226974656d4964223a226563686f2d766563746f722d6167656e74222c2264656c7461223a22227d7d0a"
+        }
+      },
+      {
+        "schema": "switchyard.codex-provider-admission-evidence/v1",
+        "evidence_digest": "sha256:a70101cb5636dc06be149262e7d3e201654745b9c09a855a8df20dd956ac3805",
+        "sequence": 9,
+        "acquisition_ordinal": 9,
+        "acquisition_kind": "NOTIFICATION",
+        "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55",
+        "work_attempt_id": "echo-vector-attempt",
+        "dispatch_occurrence_id": "echo-vector-dispatch",
+        "adapter_process_occurrence_id": "echo-vector-process",
+        "app_server_session_identity": "echo-vector-session",
+        "thread_id": "echo-vector-thread",
+        "turn_id": "echo-vector-turn",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "kind": "ACQUISITION_WATERMARK",
+        "method": "item/completed",
+        "normalized": {
+          "proves_provider_admission": false
+        },
+        "raw": {
+          "representation": "EXACT_WIRE_BYTES_INCLUDING_LINE_TERMINATOR",
+          "byte_length": 244,
+          "sha256": "sha256:fb9620247b0c3a70b9c5a1367252362ed416132d1da6f4628a799f40d3bd5abe",
+          "encoding": "hex",
+          "bytes_hex": "7b226d6574686f64223a226974656d2f636f6d706c65746564222c22706172616d73223a7b227468726561644964223a226563686f2d766563746f722d746872656164222c227475726e4964223a226563686f2d766563746f722d7475726e222c226974656d223a7b2274797065223a226167656e744d657373616765222c226964223a226563686f2d766563746f722d6167656e74222c2274657874223a22222c227068617365223a2266696e616c5f616e73776572222c226d656d6f72794369746174696f6e223a6e756c6c2c2264656c6976657279223a6e756c6c7d2c22636f6d706c6574656441744d73223a367d7d0a"
+        }
+      },
+      {
+        "schema": "switchyard.codex-provider-admission-evidence/v1",
+        "evidence_digest": "sha256:e59cdaa4581c099c49b3159746e91cfe25aa7bf633f1dbc3c207f352d4a30854",
+        "sequence": 10,
+        "acquisition_ordinal": 10,
+        "acquisition_kind": "NOTIFICATION",
+        "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55",
+        "work_attempt_id": "echo-vector-attempt",
+        "dispatch_occurrence_id": "echo-vector-dispatch",
+        "adapter_process_occurrence_id": "echo-vector-process",
+        "app_server_session_identity": "echo-vector-session",
+        "thread_id": "echo-vector-thread",
+        "turn_id": "echo-vector-turn",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "kind": "LOCAL_TURN_FACT",
+        "method": "turn/completed",
+        "normalized": {
+          "proves_provider_admission": false
+        },
+        "raw": {
+          "representation": "EXACT_WIRE_BYTES_INCLUDING_LINE_TERMINATOR",
+          "byte_length": 351,
+          "sha256": "sha256:9ce49cede21f593c0cc43a4b6c53a9b32ea24be0f90f108802623a61d4c61343",
+          "encoding": "hex",
+          "bytes_hex": "7b226d6574686f64223a227475726e2f636f6d706c65746564222c22706172616d73223a7b227468726561644964223a226563686f2d766563746f722d746872656164222c227475726e223a7b226964223a226563686f2d766563746f722d7475726e222c226974656d73223a5b7b2274797065223a226167656e744d657373616765222c226964223a226563686f2d766563746f722d6167656e74222c2274657874223a22222c227068617365223a2266696e616c5f616e73776572222c226d656d6f72794369746174696f6e223a6e756c6c2c2264656c6976657279223a6e756c6c7d5d2c226974656d7356696577223a2273756d6d617279222c22737461747573223a22636f6d706c65746564222c226572726f72223a6e756c6c2c22737461727465644174223a312c22636f6d706c657465644174223a362c226475726174696f6e4d73223a357d2c22656d697474656441744d73223a367d7d0a"
+        }
+      },
+      {
+        "schema": "switchyard.codex-provider-admission-evidence/v1",
+        "evidence_digest": "sha256:55661022a9315c29a358224ed5a351c6a417d5f195c8ee6ff69f665f6a1aa31b",
+        "sequence": 11,
+        "acquisition_ordinal": null,
+        "acquisition_kind": null,
+        "binding_digest": "sha256:3e6fc1d93916b0a06b4fdb1c71641b041090ef3631d46e82b2280d06b9d81a55",
+        "work_attempt_id": "echo-vector-attempt",
+        "dispatch_occurrence_id": "echo-vector-dispatch",
+        "adapter_process_occurrence_id": "echo-vector-process",
+        "app_server_session_identity": "echo-vector-session",
+        "thread_id": "echo-vector-thread",
+        "turn_id": "echo-vector-turn",
+        "provider": "openai",
+        "model": "gpt-5.6-terra",
+        "kind": "ACQUISITION_CUT",
+        "method": "adapter/acquisition-cut",
+        "normalized": {
+          "adapter_process_occurrence_id": "echo-vector-process",
+          "app_server_session_identity": "echo-vector-session",
+          "stream_quiesced": true,
+          "loss_generation": 0,
+          "process_disposition": "EXITED",
+          "ordered_high_water": 11,
+          "consumed_ordinal_count": 11,
+          "outstanding_client_request_count": 0,
+          "clean": true
+        },
+        "raw": null
+      }
+    ]
+  }
+}

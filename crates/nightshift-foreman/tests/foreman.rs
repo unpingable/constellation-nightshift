@@ -56,6 +56,8 @@ use tempfile::TempDir;
 
 #[path = "provider_cases/bounded_turn.rs"]
 mod bounded_turn_cases;
+#[path = "provider_cases/bounded_turn_echo.rs"]
+mod bounded_turn_echo_cases;
 #[path = "provider_cases/prelaunch.rs"]
 mod prelaunch_cases;
 #[path = "provider_cases/cli.rs"]
@@ -3662,6 +3664,22 @@ fn holding_retarget_snapshot(
     opened: &nightshift_foreman::OpenedProviderDispatchV1,
 ) -> Vec<u8> {
     let replacements = [
+        (
+            "echo-vector-attempt",
+            opened.dispatch.work_attempt_id.as_str(),
+        ),
+        (
+            "echo-vector-dispatch",
+            opened.dispatch.dispatch_occurrence_id.as_str(),
+        ),
+        (
+            "echo-vector-process",
+            opened.dispatch.adapter_process_occurrence_id.as_str(),
+        ),
+        (
+            "echo-vector-session",
+            opened.dispatch.app_server_session_identity.as_str(),
+        ),
         (
             "beta-fixture-attempt",
             opened.dispatch.work_attempt_id.as_str(),
