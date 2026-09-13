@@ -28,6 +28,12 @@ are unchanged. A standalone disposition validates a structural union plus
 exact raw replay; it does not enroll a source tuple. Full-graph admission checks
 the requirement's exact owner/schema tuple and repeats contextual replay.
 
+The `events` CLI emits compact JSON followed by a newline. Its values are
+unchanged, but whitespace is not an interface guarantee. Pretty-printing retained
+byte arrays expands a valid journal beyond the bounded inspection reader's
+allowance. Compact framing retains every value without raising the reader,
+stored-event, output, or authority limits; journal bytes and digests are unchanged.
+
 Source-shaped fixture data establishes no provider contact. The compact
 cross-language vector expands to a 118500-byte request, two user echoes, and
 32768 decoded NUL bytes (worst-case JSON escaping) in delta, completion, and

@@ -261,6 +261,9 @@ pub(super) fn native_intake(
     ]);
     assert!(readback.status.success());
     let events: Value = serde_json::from_slice(&readback.stdout).unwrap();
+    let mut compact_events = serde_json::to_vec(&events).unwrap();
+    compact_events.push(b'\n');
+    assert_eq!(readback.stdout, compact_events);
     let retained: Vec<_> = events
         .as_array()
         .unwrap()
