@@ -59,7 +59,9 @@ const PACKAGED_RUNTIME_SWITCHYARD_OWNER_HEAD: &str = "7df43b4e15cb1465f434e072b4
 // Independently frozen bounded-custody successor; selection needs new route approval.
 const BOUNDED_TURN_SWITCHYARD_OWNER_HEAD: &str = "8479cb77dc76632e64b66e84c4f75c9765e421a6";
 // Candidate only; finalized from the independently frozen Switchyard successor.
-const BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str = "ce5a3a0be8f90162581c820b85b2a785557aae24";
+const BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str = "6fe1084dc1a0e8e39a5a6c2bc108b39ace682724";
+const PRIOR_BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str =
+    "ce5a3a0be8f90162581c820b85b2a785557aae24";
 const BOUNDED_TURN_ECHO_SWITCHYARD_SCHEMA_SHA256: &str =
     "sha256:2bcf795c753a08d3c7e2ef8b521b44b155054fccbd50452662230d59ddd3f293";
 const BOUNDED_TURN_ECHO_SWITCHYARD_SCHEMA_BYTES: &[u8] = include_bytes!(
@@ -752,6 +754,20 @@ impl ProviderAdmissionOwnerPinsV1 {
             ..Self::accepted()
         }
     }
+    /// Prior echo tuple retained for exact prelaunch-closure reconciliation.
+    pub fn prior_bounded_turn_echo_candidate() -> Self {
+        Self {
+            codex_owner_head: FINAL_CODEX_OWNER_HEAD.to_owned(),
+            switchyard_owner_head: PRIOR_BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD.to_owned(),
+            switchyard_schema_sha256: BOUNDED_TURN_ECHO_SWITCHYARD_SCHEMA_SHA256.to_owned(),
+            ..Self::accepted()
+        }
+    }
+
+    fn is_bounded_turn_echo(&self) -> bool {
+        self == &Self::bounded_turn_echo_candidate()
+            || self == &Self::prior_bounded_turn_echo_candidate()
+    }
     /// Separately selected bounded-request-custody source; never an automatic fallback.
     pub fn bounded_turn_candidate() -> Self {
         Self {
@@ -821,6 +837,7 @@ impl ProviderAdmissionOwnerPinsV1 {
     pub fn validate(&self) -> Result<(), ContractError> {
         if self != &Self::accepted()
             && self != &Self::bounded_turn_echo_candidate()
+            && self != &Self::prior_bounded_turn_echo_candidate()
             && self != &Self::bounded_turn_candidate()
             && self != &Self::beta_candidate()
             && self != &Self::prior_final_beta_candidate()
@@ -4671,8 +4688,7 @@ pub fn validate_execution_availability_graph(
         // Historical owner/schema tuples retain their original frame limits.
         validate_vendored_switchyard_schema(
             &snapshot,
-            if requirement.owner_pins == ProviderAdmissionOwnerPinsV1::bounded_turn_echo_candidate()
-            {
+            if requirement.owner_pins.is_bounded_turn_echo() {
                 SwitchyardCaptureSchema::BoundedTurnEcho
             } else if requirement.owner_pins
                 == ProviderAdmissionOwnerPinsV1::bounded_turn_candidate()
@@ -4682,7 +4698,7 @@ pub fn validate_execution_availability_graph(
                 SwitchyardCaptureSchema::Legacy
             },
         )?;
-        if requirement.owner_pins == ProviderAdmissionOwnerPinsV1::bounded_turn_echo_candidate() {
+        if requirement.owner_pins.is_bounded_turn_echo() {
             bounded_turn_echo::validate_snapshot(&snapshot, true)?;
         }
         if snapshot["binding"]["codex_source_head"].as_str()
