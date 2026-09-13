@@ -1,12 +1,16 @@
 # Bounded turn echo custody candidate
 
 `ProviderAdmissionOwnerPinsV1::bounded_turn_echo_candidate()` selects Switchyard
-`ce5a3a0be8f90162581c820b85b2a785557aae24`, Codex
+`6fe1084dc1a0e8e39a5a6c2bc108b39ace682724`, Codex
 `97b0acd5ce2ccb3c87a763606696c35a450947f6`, and the vendored
 `switchyard.codex-provider-admission.bounded-turn-echo.v1.schema.json`
 (`sha256:2bcf795c753a08d3c7e2ef8b521b44b155054fccbd50452662230d59ddd3f293`).
 This is a separately enrolled `BOUNDED_TURN_ECHO_V1` capture context, not a
 replacement for historical `LEGACY_V1` or `BOUNDED_TURN_V1` tuples.
+The prior exact Switchyard tuple at
+`ce5a3a0be8f90162581c820b85b2a785557aae24` remains accepted only with the
+same echo schema digest so an already-retained prelaunch closure can be
+reconciled without rewriting its source identity.
 
 The 256KiB raw bound applies only to the selected outbound `turn/start` request
 and exact source-shaped incoming user echoes, agent items/deltas, and final
@@ -33,6 +37,12 @@ unchanged, but whitespace is not an interface guarantee. Pretty-printing retaine
 byte arrays expands a valid journal beyond the bounded inspection reader's
 allowance. Compact framing retains every value without raising the reader,
 stored-event, output, or authority limits; journal bytes and digests are unchanged.
+
+The shared prelaunch-closure validator also accepts the additive
+`REQUEST_PREFLIGHT_FAILED` reason. Unlike a runner-observed executable-capture
+failure, that reason requires the exact terminal supervisor testimony bound to
+`BEFORE_PROVIDER_CLAIM`; Foreman still requires the retained prepared dispatch
+and refuses any provider disposition before recording the local closure.
 
 Source-shaped fixture data establishes no provider contact. The compact
 cross-language vector expands to a 118500-byte request, two user echoes, and

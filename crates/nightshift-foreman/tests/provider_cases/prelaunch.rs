@@ -115,6 +115,33 @@ fn prelaunch_closure_is_atomic_idempotent_and_keeps_prepared_attempt_history() {
 }
 
 #[test]
+fn preflight_failure_requires_the_same_terminal_preclaim_testimony() {
+    let (_directory, _path, store, _packet, _admission, _profile, _policy, _requirement) =
+        holding_setup();
+    let (_, opened) = holding_open_initial(&store);
+    let mut closure = closure_fixture(&store, &opened);
+    closure["failure_code"] = json!("REQUEST_PREFLIGHT_FAILED");
+    let receipt = store
+        .accept_prelaunch_closure(&holding_canonical(&reseal(closure.clone())))
+        .unwrap();
+    assert_eq!(
+        NotStartedReceiptV1::from_slice(&receipt).unwrap().result_classification,
+        "LOCAL_PRELAUNCH_FAILURE"
+    );
+
+    let (_directory, _path, store, _packet, _admission, _profile, _policy, _requirement) =
+        holding_setup();
+    let (_, opened) = holding_open_initial(&store);
+    let mut no_testimony = closure_fixture(&store, &opened);
+    no_testimony["failure_code"] = json!("REQUEST_PREFLIGHT_FAILED");
+    no_testimony["evidence_mode"] = json!("OBSERVED_CAPTURE_FAILURE");
+    no_testimony["supervisor_attestation"] = Value::Null;
+    assert!(store
+        .accept_prelaunch_closure(&holding_canonical(&reseal(no_testimony)))
+        .is_err());
+}
+
+#[test]
 fn prelaunch_wrong_binding_unknown_state_and_nonterminal_supervisor_leave_attempt_unchanged() {
     let (_directory, _path, store, _packet, _admission, _profile, _policy, _requirement) =
         holding_setup();

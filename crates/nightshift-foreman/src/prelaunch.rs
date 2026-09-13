@@ -104,7 +104,10 @@ impl PrelaunchClosureV1 {
         let refusal = || ContractError::InvalidField("local prelaunch closure");
         if self.schema != PRELAUNCH_CLOSURE_SCHEMA
             || self.state != "PRELAUNCH_CLOSED"
-            || self.failure_code != "EXECUTABLE_CAPTURE_FAILED"
+            || !matches!(
+                self.failure_code.as_str(),
+                "EXECUTABLE_CAPTURE_FAILED" | "REQUEST_PREFLIGHT_FAILED"
+            )
             || !self.provider_claim_absent
             || self.backend_started
             || self.authority_effect != "LOCAL_PRELAUNCH_CLOSURE_ONLY"
@@ -141,7 +144,8 @@ impl PrelaunchClosureV1 {
             }
         }
         match (self.evidence_mode.as_str(), &self.supervisor_attestation) {
-            ("OBSERVED_CAPTURE_FAILURE", None) => {}
+            ("OBSERVED_CAPTURE_FAILURE", None)
+                if self.failure_code == "EXECUTABLE_CAPTURE_FAILED" => {}
             ("SUPERVISOR_ATTESTED_PRECLAIM_FAILURE", Some(proof)) => {
                 if proof.schema != "switchyard.prelaunch-supervisor-attestation/v1"
                     || proof.binding != self.binding
