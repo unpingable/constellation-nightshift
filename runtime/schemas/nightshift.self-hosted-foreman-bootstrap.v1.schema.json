@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:self-hosted-foreman-bootstrap:v1",
+  "title": "Nightshift self-hosted foreman bootstrap V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "bootstrap_digest",
+    "digest_preimage",
+    "campaign_codename",
+    "canonical_slug",
+    "track",
+    "holding_result_head",
+    "holding_qualified_subject",
+    "durable_roadmap_head",
+    "midnight_result_head",
+    "silicon_result_head",
+    "codex_owner_head",
+    "switchyard_owner_head",
+    "bootstrap_occurrence_id",
+    "run_id",
+    "packet_id",
+    "packet_digest",
+    "predecessor_v2_packet_digest",
+    "admission_digest",
+    "profile_digest",
+    "capacity_requirement_digest",
+    "capacity_policy_digest",
+    "execution_availability_requirement_digest",
+    "execution_availability_policy_digest",
+    "local_runtime_identity",
+    "evaluated_at",
+    "expected_work_item_count",
+    "initially_runnable_lane_count",
+    "presentation_only_question_work_item_id",
+    "maximum_driver_steps",
+    "maximum_wall_seconds",
+    "bootstrap_depth",
+    "parent_bootstrap_occurrence_id",
+    "scheduler_owner",
+    "worker_adapter_mode",
+    "wake_source_policy",
+    "closeout_policy",
+    "authority_effect",
+    "target_effects_authorized",
+    "approval_response_authorized",
+    "protected_effect_authorized",
+    "semantic_retry_authorized",
+    "bootstrap_may_nest",
+    "worker_may_invoke_bootstrap",
+    "outer_conversation_scheduler",
+    "timer_or_service_activation_authorized",
+    "production_activation_authorized",
+    "aggregate_result_created"
+  ],
+  "properties": {
+    "schema": {
+      "const": "nightshift.self-hosted-foreman-bootstrap/v1"
+    },
+    "bootstrap_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "digest_preimage": {
+      "const": "domain prefix nightshift.self-hosted-foreman-bootstrap.digest/v1 NUL, then the bootstrap object with bootstrap_digest omitted as RFC8785-JCS"
+    },
+    "campaign_codename": {
+      "const": "SECOND-WATCH"
+    },
+    "canonical_slug": {
+      "const": "nightshift-self-hosted-foreman-bootstrap-v1"
+    },
+    "track": {
+      "const": "nightshift-self-hosting"
+    },
+    "holding_result_head": {
+      "const": "0dff82fa3522e59a6ce8e8161f6aed92cbacc061"
+    },
+    "holding_qualified_subject": {
+      "const": "57c165fb246a530bc9448afbe3a26c17a5118ebd"
+    },
+    "durable_roadmap_head": {
+      "const": "70e3b734e979173ae552efb322b48bf7fb0c028b"
+    },
+    "midnight_result_head": {
+      "const": "6160a7fac9845aaefefbc11847e55786b35749e6"
+    },
+    "silicon_result_head": {
+      "const": "f6e95c8a51982a9381c27c4792c8d9fd6f1daf47"
+    },
+    "codex_owner_head": {
+      "const": "c36a8137638decf8b04a49611354a90f32c5a945"
+    },
+    "switchyard_owner_head": {
+      "const": "2ba25db66d8b29dd215bd87e05f4ea794024b3b7"
+    },
+    "bootstrap_occurrence_id": {
+      "$ref": "#/$defs/id"
+    },
+    "run_id": {
+      "$ref": "#/$defs/id"
+    },
+    "packet_id": {
+      "$ref": "#/$defs/id"
+    },
+    "packet_digest": {
+      "$ref": "#/$defs/fresh_packet_digest"
+    },
+    "predecessor_v2_packet_digest": {
+      "const": "sha256:1df7f47bb3ea70d0f987e756f34aaa62f7187a659ef0bcc8d7c8aa2e645431fc"
+    },
+    "admission_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "profile_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "capacity_requirement_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "capacity_policy_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "execution_availability_requirement_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "execution_availability_policy_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "local_runtime_identity": {
+      "$ref": "#/$defs/id"
+    },
+    "evaluated_at": {
+      "$ref": "#/$defs/time"
+    },
+    "expected_work_item_count": {
+      "type": "integer",
+      "minimum": 3,
+      "maximum": 1024
+    },
+    "initially_runnable_lane_count": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 1024
+    },
+    "presentation_only_question_work_item_id": {
+      "$ref": "#/$defs/id"
+    },
+    "maximum_driver_steps": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000
+    },
+    "maximum_wall_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 86400
+    },
+    "bootstrap_depth": {
+      "const": 0
+    },
+    "parent_bootstrap_occurrence_id": {
+      "type": "null"
+    },
+    "scheduler_owner": {
+      "const": "NIGHTSHIFT_DURABLE_FOREMAN"
+    },
+    "worker_adapter_mode": {
+      "const": "CAMPAIGN_QUALIFICATION_DETERMINISTIC_FAKE"
+    },
+    "wake_source_policy": {
+      "const": "QUALIFIED_LOCAL_REEVALUATION_NO_EVIDENCE_OR_AUTHORITY"
+    },
+    "closeout_policy": {
+      "const": "ALL_EXPLICIT_TERMINAL_OR_NOT_STARTED"
+    },
+    "authority_effect": {
+      "const": "LOCAL_AGENT_COMPUTE_SCHEDULING_ONLY"
+    },
+    "target_effects_authorized": {
+      "const": false
+    },
+    "approval_response_authorized": {
+      "const": false
+    },
+    "protected_effect_authorized": {
+      "const": false
+    },
+    "semantic_retry_authorized": {
+      "const": false
+    },
+    "bootstrap_may_nest": {
+      "const": false
+    },
+    "worker_may_invoke_bootstrap": {
+      "const": false
+    },
+    "outer_conversation_scheduler": {
+      "const": false
+    },
+    "timer_or_service_activation_authorized": {
+      "const": false
+    },
+    "production_activation_authorized": {
+      "const": false
+    },
+    "aggregate_result_created": {
+      "const": false
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "fresh_packet_digest": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/digest"
+        },
+        {
+          "not": {
+            "const": "sha256:1df7f47bb3ea70d0f987e756f34aaa62f7187a659ef0bcc8d7c8aa2e645431fc"
+          }
+        }
+      ]
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9._:/-]+$"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:Z|\\.(?:(?!000)[0-9]{3}|[0-9]{3}(?!000)[0-9]{3}|[0-9]{6}(?!000)[0-9]{3})Z)$"
+    }
+  }
+}

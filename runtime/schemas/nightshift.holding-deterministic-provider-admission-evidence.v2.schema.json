@@ -1,0 +1,41 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"urn:nightshift:holding-deterministic-provider-admission-evidence:v2",
+  "title":"Nightshift SECOND-WATCH deterministic provider execution evidence V2",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema","evidence_digest","producer_id","producer_version","executable_id","executable_sha256","work_attempt_id","dispatch_occurrence_id","provider_request_occurrence_id","provider_id","model_id","outcome","response_created","non_admission_proven","retry_after","observed_at","received_at","provider_execution","raw_evidence","authority_effect"],
+  "properties":{
+    "schema":{"const":"nightshift.holding-deterministic-provider-admission-evidence/v2"},
+    "evidence_digest":{"$ref":"#/$defs/digest"},
+    "producer_id":{"const":"nightshift:holding-pattern-deterministic-fake-adapter"},
+    "producer_version":{"const":"v2"},
+    "executable_id":{"const":"campaign:second-watch:deterministic-fake-adapter:v2"},
+    "executable_sha256":{"const":"sha256:bcfea17f0aff021d6b69f2b3d924e7606bf74941671a5a7af13e2d1e3d43edd4"},
+    "work_attempt_id":{"$ref":"#/$defs/id"},
+    "dispatch_occurrence_id":{"$ref":"#/$defs/id"},
+    "provider_request_occurrence_id":{"$ref":"#/$defs/id"},
+    "provider_id":{"$ref":"#/$defs/id"},
+    "model_id":{"$ref":"#/$defs/id"},
+    "outcome":{"enum":["PROVIDER_UNAVAILABLE","EXECUTION_COMPLETED"]},
+    "response_created":{"type":"boolean"},
+    "non_admission_proven":{"type":"boolean"},
+    "retry_after":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/time"}]},
+    "observed_at":{"$ref":"#/$defs/time"},
+    "received_at":{"$ref":"#/$defs/time"},
+    "provider_execution":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/execution"}]},
+    "raw_evidence":{"$ref":"#/$defs/raw"},
+    "authority_effect":{"const":"QUALIFICATION_MECHANISM_EVIDENCE_ONLY"}
+  },
+  "allOf":[
+    {"if":{"properties":{"outcome":{"const":"PROVIDER_UNAVAILABLE"}}},"then":{"properties":{"response_created":{"const":false},"non_admission_proven":{"const":true},"retry_after":{"$ref":"#/$defs/time"},"provider_execution":{"type":"null"}}}},
+    {"if":{"properties":{"outcome":{"const":"EXECUTION_COMPLETED"}}},"then":{"properties":{"response_created":{"const":true},"non_admission_proven":{"const":false},"retry_after":{"type":"null"},"provider_execution":{"$ref":"#/$defs/execution"}}}}
+  ],
+  "$defs":{
+    "digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "id":{"type":"string","minLength":1,"maxLength":512,"pattern":"^[A-Za-z0-9._:/-]+$"},
+    "time":{"type":"string","format":"date-time","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:Z|\\.(?:(?!000)[0-9]{3}|[0-9]{3}(?!000)[0-9]{3}|[0-9]{6}(?!000)[0-9]{3})Z)$"},
+    "execution":{"type":"object","additionalProperties":false,"required":["provider_id","model_id","app_server_session_identity","thread_id","turn_id","first_response_id"],"properties":{"provider_id":{"$ref":"#/$defs/id"},"model_id":{"$ref":"#/$defs/id"},"app_server_session_identity":{"$ref":"#/$defs/id"},"thread_id":{"$ref":"#/$defs/id"},"turn_id":{"$ref":"#/$defs/id"},"first_response_id":{"$ref":"#/$defs/id"}}},
+    "raw":{"type":"object","additionalProperties":false,"required":["representation","byte_length","sha256","encoding","bytes_hex"],"properties":{"representation":{"const":"EXACT_PROVIDER_AVAILABILITY_SOURCE_BYTES"},"byte_length":{"type":"integer","minimum":1,"maximum":16384},"sha256":{"$ref":"#/$defs/digest"},"encoding":{"const":"hex"},"bytes_hex":{"type":"string","minLength":2,"maxLength":32768,"pattern":"^[0-9a-f]+$"}}}
+  }
+}

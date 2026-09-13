@@ -7,6 +7,24 @@ Deferred agent work with receipts, reconciliation, and governed promotion.
 
 > Let agents work late without giving them the keys.
 
+
+## Two source workspaces
+
+The additive [`runtime/`](runtime/) workspace is the source-pinned canonical
+cycle and Foreman runtime. Its exact inputs are recorded in
+[`runtime/SOURCE-PROVENANCE.json`](runtime/SOURCE-PROVENANCE.json); see the
+[`runtime` custody guide](runtime/docs/BOUNDED_PROVIDER_CUSTODY_V1.md).
+Build it with `cargo build --locked --manifest-path runtime/Cargo.toml`.
+The distributed test gate is only
+`cargo test --locked --manifest-path runtime/Cargo.toml -p nightshift-foreman`;
+workspace-wide and Casework test suites require fixture inputs not distributed
+in this source cut.
+
+The repository-root workspace is the predecessor command set documented below.
+Its Diagnostics, Watchbill, Runs, NQ, Liveness, and agenda-keyed Attention
+commands are not aliases for the canonical runtime. Existing immutable
+revisions continue to retain that predecessor source.
+
 ## Status (2026-07-26)
 
 Night Shift is the **proposal and read-only orchestration office** of a

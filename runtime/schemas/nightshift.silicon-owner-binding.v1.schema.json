@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:silicon-owner-binding:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "monitor_fixture_head",
+    "nq_result_head",
+    "monitor_bundle_sha256",
+    "nq_artifact_sha256",
+    "claim_deck_digest",
+    "grants_authority"
+  ],
+  "properties": {
+    "schema": {"const": "nightshift.silicon-owner-binding/v1"},
+    "monitor_fixture_head": {
+      "const": "bb75c4325f903f2c544e9758b5ea8d30c8bbc773"
+    },
+    "nq_result_head": {
+      "const": "78ba5137c83089d6f1cd2bada65f6f7bdda2669c"
+    },
+    "monitor_bundle_sha256": {"$ref": "#/$defs/digest"},
+    "nq_artifact_sha256": {"$ref": "#/$defs/digest"},
+    "claim_deck_digest": {
+      "const": "sha256:7f9ba67910df6962e4e02cb2e1fa75562a59889e16cef3c9133c90aa090cea0d"
+    },
+    "grants_authority": {"const": false}
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

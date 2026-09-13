@@ -1,0 +1,29 @@
+[package]
+name = "nightshift-provider-capacity"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+autobins = false
+
+[lib]
+name = "nightshift_provider_capacity"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nightshift-provider-capacity"
+path = "src/bin/nightshift_provider_capacity.rs"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_jcs.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/nightshiftd",
+    "crates/nightshift-casework",
+    "crates/nightshift-foreman",
+    "crates/nightshift-provider-capacity",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["James Beck"]
+rust-version = "1.82"
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_jcs = "0.1"
+serde_json_canonicalizer = "=0.3.2"
+chrono = { version = "0.4", features = ["serde"] }
+sha2 = "0.10"
+rusqlite = { version = "0.32", features = ["bundled", "chrono"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+tempfile = "3"
+libc = "0.2"
+ed25519-dalek = "2.2"
+hex = "0.4"

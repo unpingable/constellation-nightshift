@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:foreman-execution-profile:v1",
+  "title": "Nightshift foreman execution profile V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "profile_digest", "packet_digest", "admission_digest", "adapters",
+    "work_items", "budget_policy_ref", "log_custody_root", "receipt_custody_root",
+    "maximum_event_bytes", "maximum_receipt_bytes", "adapter_timeout_seconds",
+    "closeout_policy"
+  ],
+  "properties": {
+    "schema": {"const": "nightshift.foreman-execution-profile/v1"},
+    "profile_digest": {"$ref": "#/$defs/digest"},
+    "packet_digest": {"$ref": "#/$defs/digest"},
+    "admission_digest": {"$ref": "#/$defs/digest"},
+    "adapters": {
+      "type": "object", "minProperties": 1,
+      "propertyNames": {"$ref": "#/$defs/id"},
+      "additionalProperties": {"$ref": "#/$defs/adapter"}
+    },
+    "work_items": {
+      "type": "object", "minProperties": 1,
+      "propertyNames": {"$ref": "#/$defs/id"},
+      "additionalProperties": {"$ref": "#/$defs/work_item"}
+    },
+    "budget_policy_ref": {"$ref": "#/$defs/id"},
+    "log_custody_root": {"type": "string", "pattern": "^/"},
+    "receipt_custody_root": {"type": "string", "pattern": "^/"},
+    "maximum_event_bytes": {"type": "integer", "minimum": 1024, "maximum": 16777216},
+    "maximum_receipt_bytes": {"type": "integer", "minimum": 1024, "maximum": 16777216},
+    "adapter_timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 86400},
+    "closeout_policy": {"const": "ALL_EXPLICIT_TERMINAL_OR_NOT_STARTED"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-fA-F]{64}$"},
+    "id": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9._:/-]+$"},
+    "adapter": {
+      "type": "object", "additionalProperties": false,
+      "required": ["adapter_id", "protocol", "executable_identity", "bounded_arguments"],
+      "properties": {
+        "adapter_id": {"$ref": "#/$defs/id"},
+        "protocol": {"$ref": "#/$defs/id"},
+        "executable_identity": {"$ref": "#/$defs/digest"},
+        "bounded_arguments": {
+          "type": "array", "maxItems": 32,
+          "items": {"type": "string", "maxLength": 1024}
+        }
+      }
+    },
+    "work_item": {
+      "type": "object", "additionalProperties": false,
+      "required": ["adapter_id", "workspace_identity", "resource_lock_keys", "provider_model_class"],
+      "properties": {
+        "adapter_id": {"$ref": "#/$defs/id"},
+        "workspace_identity": {"$ref": "#/$defs/id"},
+        "resource_lock_keys": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": {"$ref": "#/$defs/id"}
+        },
+        "provider_model_class": {"$ref": "#/$defs/id"}
+      }
+    }
+  }
+}

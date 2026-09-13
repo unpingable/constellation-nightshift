@@ -1,0 +1,397 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:provider-execution-availability-and-deferred-dispatch-qualification:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "campaign",
+    "qualified_subject_commit",
+    "result_head_locator",
+    "exact_accepted_subjects",
+    "nightshift_ancestry",
+    "independent_classifications",
+    "twenty_case_matrix",
+    "owner_taxonomy",
+    "mechanism_law",
+    "qualification",
+    "casework",
+    "human_questions",
+    "custody",
+    "closeout"
+  ],
+  "properties": {
+    "schema": {
+      "const": "nightshift.provider-execution-availability-and-deferred-dispatch-qualification/v1"
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["codename", "canonical_slug", "track"],
+      "properties": {
+        "codename": {"const": "HOLDING-PATTERN"},
+        "canonical_slug": {"const": "provider-execution-availability-and-deferred-dispatch-v1"},
+        "track": {"const": "provider-execution-availability"}
+      }
+    },
+    "qualified_subject_commit": {
+      "const": "57c165fb246a530bc9448afbe3a26c17a5118ebd"
+    },
+    "result_head_locator": {"const": "COMMIT_CONTAINING_THIS_RECEIPT"},
+    "exact_accepted_subjects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "codex_provider_admission_owner",
+        "switchyard_provider_admission_mapper",
+        "nightshift_contract_graph",
+        "nightshift_worker_start_v3",
+        "nightshift_durable_storage",
+        "nightshift_casework_backend",
+        "nightshift_casework_ui"
+      ],
+      "properties": {
+        "codex_provider_admission_owner": {"const": "c36a8137638decf8b04a49611354a90f32c5a945"},
+        "switchyard_provider_admission_mapper": {"const": "2ba25db66d8b29dd215bd87e05f4ea794024b3b7"},
+        "nightshift_contract_graph": {"const": "8c11e8c45978a10bc32dd75a9091d1a5ad8fda32"},
+        "nightshift_worker_start_v3": {"const": "540f3945b695e5c7400454e0d99b005041c893f7"},
+        "nightshift_durable_storage": {"const": "8bf9099a3481fa83e93e1806cca5397b97763be8"},
+        "nightshift_casework_backend": {"const": "0d2f735fbd2a4a00adad43688b28582dcc51ff22"},
+        "nightshift_casework_ui": {"const": "57c165fb246a530bc9448afbe3a26c17a5118ebd"}
+      }
+    },
+    "nightshift_ancestry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "midnight_rail_result",
+        "silicon_orchard_result",
+        "durable_roadmap",
+        "contract_graph",
+        "worker_start_v3",
+        "durable_storage",
+        "casework_backend",
+        "casework_ui"
+      ],
+      "properties": {
+        "midnight_rail_result": {"const": "6160a7fac9845aaefefbc11847e55786b35749e6"},
+        "silicon_orchard_result": {"const": "f6e95c8a51982a9381c27c4792c8d9fd6f1daf47"},
+        "durable_roadmap": {"const": "70e3b734e979173ae552efb322b48bf7fb0c028b"},
+        "contract_graph": {"const": true},
+        "worker_start_v3": {"const": true},
+        "durable_storage": {"const": true},
+        "casework_backend": {"const": true},
+        "casework_ui": {"const": true}
+      }
+    },
+    "independent_classifications": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "codex_owner",
+        "switchyard_mapper",
+        "nightshift_contract",
+        "worker_start_v3",
+        "durable_foreman_mechanism",
+        "twenty_case_matrix",
+        "fuel_independence",
+        "casework_backend",
+        "casework_ui",
+        "real_provider_lifecycle",
+        "real_codex_app_server_executable_identity",
+        "live_timer_or_service",
+        "production_or_default_route",
+        "external_authority_or_protected_effect",
+        "installed_browser",
+        "supplemental_outer_capacity_refusal"
+      ],
+      "properties": {
+        "codex_owner": {"const": "QUALIFIED_DETERMINISTIC_MOCK_PROVIDER"},
+        "switchyard_mapper": {"const": "QUALIFIED_DETERMINISTIC_MOCK_APP_SERVER"},
+        "nightshift_contract": {"const": "QUALIFIED"},
+        "worker_start_v3": {"const": "QUALIFIED"},
+        "durable_foreman_mechanism": {"const": "QUALIFIED_DETERMINISTIC"},
+        "twenty_case_matrix": {"const": "QUALIFIED_DETERMINISTIC"},
+        "fuel_independence": {"const": "QUALIFIED_DETERMINISTIC"},
+        "casework_backend": {"const": "QUALIFIED_READ_ONLY"},
+        "casework_ui": {"const": "QUALIFIED_DETERMINISTIC_UI"},
+        "real_provider_lifecycle": {"const": "NOT_RUN"},
+        "real_codex_app_server_executable_identity": {"const": "NOT_RUN"},
+        "live_timer_or_service": {"const": "NOT_RUN"},
+        "production_or_default_route": {"const": "NOT_RUN"},
+        "external_authority_or_protected_effect": {"const": "NOT_EXERCISED"},
+        "installed_browser": {"const": "NOT_RUN"},
+        "supplemental_outer_capacity_refusal": {
+          "const": "OBSERVED_ONLY_NOT_QUALIFICATION_EVIDENCE"
+        }
+      }
+    },
+    "twenty_case_matrix": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "uniqueItems": true,
+      "prefixItems": [
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 1}, "case": {"const": "99_percent_quota_selected_model_at_capacity"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 2}, "case": {"const": "retry_after_retention_and_exact_wake_at"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 3}, "case": {"const": "repeated_capacity_refusals_bounded_backoff"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 4}, "case": {"const": "capacity_later_returning"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 5}, "case": {"const": "rate_limit_later_returning_qualification_owner"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 6}, "case": {"const": "transport_failure_before_known_admission"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 7}, "case": {"const": "lost_response_after_possible_admission"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 8}, "case": {"const": "crash_while_parked"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 9}, "case": {"const": "crash_after_wake_before_dispatch"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 10}, "case": {"const": "duplicate_wake_convergence"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 11}, "case": {"const": "permitted_ordered_model_fallback"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 12}, "case": {"const": "forbidden_model_fallback"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 13}, "case": {"const": "post_admission_model_change_refused"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 14}, "case": {"const": "bounded_backoff_no_provider_hammering"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 15}, "case": {"const": "independent_lane_progress"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 16}, "case": {"const": "exact_replay_and_concurrent_writer"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 17}, "case": {"const": "dispatch_and_execution_identity_substitution"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 18}, "case": {"const": "indeterminate_reconciliation_proves_non_admission"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 19}, "case": {"const": "indeterminate_reconciliation_proves_admission"}}},
+        {"$ref": "#/$defs/matrix_case", "properties": {"ordinal": {"const": 20}, "case": {"const": "unresolved_reconciliation_preserves_stop_law"}}}
+      ],
+      "items": false
+    },
+    "owner_taxonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "production_codex_auto_park",
+        "production_other_categories_gain_auto_park",
+        "qualification_fake_adapter_only",
+        "qualification_fake_non_admission_park",
+        "qualification_fake_authentication_auto_retry",
+        "qualification_fake_transport_protocol_redispatch",
+        "quota_is_fuel_owned"
+      ],
+      "properties": {
+        "production_codex_auto_park": {
+          "const": ["NOT_ADMITTED_MODEL_AT_CAPACITY"]
+        },
+        "production_other_categories_gain_auto_park": {"const": false},
+        "qualification_fake_adapter_only": {"const": true},
+        "qualification_fake_non_admission_park": {
+          "const": [
+            "NOT_ADMITTED_PROVIDER_UNAVAILABLE",
+            "NOT_ADMITTED_RATE_LIMITED"
+          ]
+        },
+        "qualification_fake_authentication_auto_retry": {"const": false},
+        "qualification_fake_transport_protocol_redispatch": {"const": false},
+        "quota_is_fuel_owned": {"const": true}
+      }
+    },
+    "mechanism_law": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "work_attempt_and_dispatch_occurrence_distinct",
+        "fresh_dispatch_after_wake",
+        "semantic_retry",
+        "approval_response_authorized",
+        "same_execution_resume_only_after_admission",
+        "indeterminate_auto_redispatch",
+        "model_fallback_ordered_pre_admission_only",
+        "resource_release_reacquire_history_exact",
+        "query_only_casework",
+        "aggregate_result_created"
+      ],
+      "properties": {
+        "work_attempt_and_dispatch_occurrence_distinct": {"const": true},
+        "fresh_dispatch_after_wake": {"const": true},
+        "semantic_retry": {"const": false},
+        "approval_response_authorized": {"const": false},
+        "same_execution_resume_only_after_admission": {"const": true},
+        "indeterminate_auto_redispatch": {"const": false},
+        "model_fallback_ordered_pre_admission_only": {"const": true},
+        "resource_release_reacquire_history_exact": {"const": true},
+        "query_only_casework": {"const": true},
+        "aggregate_result_created": {"const": false}
+      }
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "locked_workspace",
+        "foreman_execution_availability_contract_passed",
+        "foreman_integration_passed",
+        "named_holding_integration_passed",
+        "worker_start_v3_passed",
+        "schema_and_report_passed",
+        "frontend_passed",
+        "frontend_test_files",
+        "frontend_production_build",
+        "workspace_clippy_all_targets_all_features_warnings_denied",
+        "formatting",
+        "switchyard_exact_snapshots",
+        "switchyard_owner_terminal_snapshots",
+        "switchyard_owner_generic_replayable",
+        "switchyard_parity",
+        "worker_start_v3_boundary",
+        "canonical_nightshiftd_production_binary_count",
+        "structural_gates_passed",
+        "deterministic_negative_controls_passed",
+        "independent_ui_audit"
+      ],
+      "properties": {
+        "locked_workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["passed", "failed", "ignored_environment_dependent"],
+          "properties": {
+            "passed": {"const": 463},
+            "failed": {"const": 0},
+            "ignored_environment_dependent": {"const": 16}
+          }
+        },
+        "foreman_execution_availability_contract_passed": {"const": 17},
+        "foreman_integration_passed": {"const": 59},
+        "named_holding_integration_passed": {"const": 29},
+        "worker_start_v3_passed": {"const": 5},
+        "schema_and_report_passed": {"const": 58},
+        "frontend_passed": {"const": 32},
+        "frontend_test_files": {"const": 7},
+        "frontend_production_build": {"const": "PASSED"},
+        "workspace_clippy_all_targets_all_features_warnings_denied": {"const": "PASSED"},
+        "formatting": {"const": "PASSED"},
+        "switchyard_exact_snapshots": {"const": 5},
+        "switchyard_owner_terminal_snapshots": {"const": 126},
+        "switchyard_owner_generic_replayable": {"const": 118},
+        "switchyard_parity": {"const": "PASSED"},
+        "worker_start_v3_boundary": {"const": "PASSED"},
+        "canonical_nightshiftd_production_binary_count": {"const": 2},
+        "structural_gates_passed": {"const": 9},
+        "deterministic_negative_controls_passed": {"const": 9},
+        "independent_ui_audit": {"const": "ACCEPTED"}
+      }
+    },
+    "casework": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "legacy_absence_explicit",
+        "exact_raw_links",
+        "fuel_status_independent",
+        "http_get_only",
+        "http_head_is_405",
+        "controls_present",
+        "aggregate_present"
+      ],
+      "properties": {
+        "schema": {"const": "nightshift.casework-live-provider-execution/v1"},
+        "legacy_absence_explicit": {"const": true},
+        "exact_raw_links": {"const": true},
+        "fuel_status_independent": {"const": true},
+        "http_get_only": {"const": true},
+        "http_head_is_405": {"const": true},
+        "controls_present": {"const": false},
+        "aggregate_present": {"const": false}
+      }
+    },
+    "human_questions": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "branch",
+        "publication_policy",
+        "codex_subject_repository",
+        "switchyard_subject_repository",
+        "successor_base_policy"
+      ],
+      "properties": {
+        "branch": {
+          "const": "campaign/holding-pattern-provider-execution-availability-and-deferred-dispatch-v1-20260831"
+        },
+        "publication_policy": {
+          "const": "ESTABLISHED_ORIGIN_ONLY_AFTER_INDEPENDENT_CLOSEOUT_AUDIT"
+        },
+        "codex_subject_repository": {"const": "USER_OWNED_SEPARATE_REPOSITORY"},
+        "switchyard_subject_repository": {"const": "SOLE_LOCAL_SEPARATE_REPOSITORY"},
+        "successor_base_policy": {"const": "EXACT_RESULT_ANCESTRY"}
+      }
+    },
+    "closeout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default_branch_mutated",
+        "production_activated",
+        "real_provider_contacted",
+        "real_executable_identity_qualified",
+        "authentication_profile_copied_or_read",
+        "approval_response_sent",
+        "protected_effect_occurred",
+        "live_timer_or_service_activated",
+        "campaign_process_remaining",
+        "campaign_listener_remaining",
+        "campaign_provider_session_remaining",
+        "campaign_store_remaining",
+        "credential_artifact_remaining",
+        "teardown_obligation_remaining",
+        "second_watch_started"
+      ],
+      "properties": {
+        "default_branch_mutated": {"const": false},
+        "production_activated": {"const": false},
+        "real_provider_contacted": {"const": false},
+        "real_executable_identity_qualified": {"const": false},
+        "authentication_profile_copied_or_read": {"const": false},
+        "approval_response_sent": {"const": false},
+        "protected_effect_occurred": {"const": false},
+        "live_timer_or_service_activated": {"const": false},
+        "campaign_process_remaining": {"const": false},
+        "campaign_listener_remaining": {"const": false},
+        "campaign_provider_session_remaining": {"const": false},
+        "campaign_store_remaining": {"const": false},
+        "credential_artifact_remaining": {"const": false},
+        "teardown_obligation_remaining": {"const": false},
+        "second_watch_started": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "matrix_case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "case", "disposition"],
+      "properties": {
+        "ordinal": {"type": "integer", "minimum": 1, "maximum": 20},
+        "case": {
+          "type": "string",
+          "enum": [
+            "99_percent_quota_selected_model_at_capacity",
+            "retry_after_retention_and_exact_wake_at",
+            "repeated_capacity_refusals_bounded_backoff",
+            "capacity_later_returning",
+            "rate_limit_later_returning_qualification_owner",
+            "transport_failure_before_known_admission",
+            "lost_response_after_possible_admission",
+            "crash_while_parked",
+            "crash_after_wake_before_dispatch",
+            "duplicate_wake_convergence",
+            "permitted_ordered_model_fallback",
+            "forbidden_model_fallback",
+            "post_admission_model_change_refused",
+            "bounded_backoff_no_provider_hammering",
+            "independent_lane_progress",
+            "exact_replay_and_concurrent_writer",
+            "dispatch_and_execution_identity_substitution",
+            "indeterminate_reconciliation_proves_non_admission",
+            "indeterminate_reconciliation_proves_admission",
+            "unresolved_reconciliation_preserves_stop_law"
+          ]
+        },
+        "disposition": {"const": "PASSED"}
+      }
+    }
+  }
+}

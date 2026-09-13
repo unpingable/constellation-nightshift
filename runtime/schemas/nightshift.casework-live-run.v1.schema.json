@@ -1,0 +1,444 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unpingable.github.io/nightshift/schemas/nightshift.casework-live-run.v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "projection_digest", "navigation_id", "run_id", "evaluated_at",
+    "packet", "admission", "execution_profile", "foreman", "work_items",
+    "resource_claims", "events", "raw_sources", "sealed_case_run_id", "provider_capacity", "authority_effect"
+  ],
+  "properties": {
+    "schema": { "const": "nightshift.casework-live-run/v1" },
+    "projection_digest": { "$ref": "#/$defs/digest" },
+    "navigation_id": { "$ref": "#/$defs/navigation_id" },
+    "run_id": { "$ref": "#/$defs/text" },
+    "evaluated_at": { "$ref": "#/$defs/time" },
+    "packet": { "$ref": "#/$defs/packet" },
+    "admission": { "$ref": "#/$defs/admission" },
+    "execution_profile": { "$ref": "#/$defs/profile" },
+    "foreman": { "$ref": "#/$defs/foreman" },
+    "work_items": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": { "$ref": "#/$defs/work_item" }
+    },
+    "resource_claims": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": { "$ref": "#/$defs/resource_claim" }
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 1048576,
+      "items": { "$ref": "#/$defs/event" }
+    },
+    "raw_sources": { "$ref": "#/$defs/raw_sources" },
+    "sealed_case_run_id": { "$ref": "#/$defs/nullable_text" },
+    "provider_capacity": { "$ref": "#/$defs/provider_capacity" },
+    "authority_effect": { "const": "READ_ONLY_OPERATOR_PROJECTION" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "provider_capacity": {
+            "properties": { "status": { "const": "NOT_RECORDED_BY_FOREMAN" } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "execution_profile": {
+            "properties": {
+              "capacity_binding_status": { "const": "POLICY_REFERENCE_ONLY_NO_RECORDED_DECISION" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "provider_capacity": {
+            "properties": { "status": { "const": "EXACT_RECORDED_BY_FOREMAN" } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "execution_profile": {
+            "properties": {
+              "capacity_binding_status": { "const": "EXACT_RECORDED_CAPACITY_REQUIREMENT" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "text": { "type": "string", "maxLength": 65536 },
+    "short_text": { "type": "string", "maxLength": 4096 },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "navigation_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "time": { "type": "string", "format": "date-time" },
+    "nullable_text": {
+      "oneOf": [
+        { "$ref": "#/$defs/text" },
+        { "type": "null" }
+      ]
+    },
+    "nullable_digest": {
+      "oneOf": [
+        { "$ref": "#/$defs/digest" },
+        { "type": "null" }
+      ]
+    },
+    "strings": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": { "$ref": "#/$defs/text" }
+    },
+    "packet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packet_id", "packet_digest", "exact_bytes_sha256", "integrity",
+        "created_at", "current_until", "currentness"
+      ],
+      "properties": {
+        "packet_id": { "$ref": "#/$defs/short_text" },
+        "packet_digest": { "$ref": "#/$defs/digest" },
+        "exact_bytes_sha256": { "$ref": "#/$defs/digest" },
+        "integrity": { "const": "VALID" },
+        "created_at": { "$ref": "#/$defs/time" },
+        "current_until": { "$ref": "#/$defs/time" },
+        "currentness": { "enum": ["NOT_YET_CURRENT", "CURRENT", "EXPIRED"] }
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "admission_digest", "exact_bytes_sha256", "admitted_at", "expires_at",
+        "currentness", "maximum_concurrent_workers"
+      ],
+      "properties": {
+        "admission_digest": { "$ref": "#/$defs/digest" },
+        "exact_bytes_sha256": { "$ref": "#/$defs/digest" },
+        "admitted_at": { "$ref": "#/$defs/time" },
+        "expires_at": { "$ref": "#/$defs/time" },
+        "currentness": { "enum": ["NOT_YET_CURRENT", "CURRENT", "EXPIRED"] },
+        "maximum_concurrent_workers": { "type": "integer", "minimum": 1, "maximum": 4 }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_digest", "exact_bytes_sha256", "budget_policy_ref",
+        "capacity_binding_status"
+      ],
+      "properties": {
+        "profile_digest": { "$ref": "#/$defs/digest" },
+        "exact_bytes_sha256": { "$ref": "#/$defs/digest" },
+        "budget_policy_ref": { "$ref": "#/$defs/short_text" },
+        "capacity_binding_status": {
+          "enum": [
+            "POLICY_REFERENCE_ONLY_NO_RECORDED_DECISION",
+            "EXACT_RECORDED_CAPACITY_REQUIREMENT"
+          ]
+        }
+      }
+    },
+    "foreman": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_schema", "lifecycle", "scheduler_state_counts",
+        "terminal_receipt_count", "not_started_receipt_count",
+        "closed_final_receipts_digest"
+      ],
+      "properties": {
+        "source_schema": { "const": "nightshift.foreman-live-run/v1" },
+        "lifecycle": {
+          "enum": ["OPEN", "CLOSED_EXACT_FINAL_SNAPSHOT_RETAINED"]
+        },
+        "scheduler_state_counts": {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": { "$ref": "#/$defs/short_text" },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4096
+          }
+        },
+        "terminal_receipt_count": { "type": "integer", "minimum": 0, "maximum": 4096 },
+        "not_started_receipt_count": { "type": "integer", "minimum": 0, "maximum": 4096 },
+        "closed_final_receipts_digest": { "$ref": "#/$defs/nullable_digest" }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "navigation_id", "question_id", "question", "exhausted_evidence", "safe_default",
+        "consequences", "resume_point"
+      ],
+      "properties": {
+        "navigation_id": { "$ref": "#/$defs/navigation_id" },
+        "question_id": { "$ref": "#/$defs/short_text" },
+        "question": { "$ref": "#/$defs/text" },
+        "exhausted_evidence": { "$ref": "#/$defs/text" },
+        "safe_default": { "$ref": "#/$defs/text" },
+        "consequences": { "$ref": "#/$defs/text" },
+        "resume_point": { "$ref": "#/$defs/text" }
+      }
+    },
+    "accepted_outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "result_classification", "receipt_digest"],
+      "properties": {
+        "state": { "$ref": "#/$defs/text" },
+        "result_classification": { "$ref": "#/$defs/text" },
+        "receipt_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "work_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "accepted_receipt_kind": { "type": "null" } },
+            "required": ["accepted_receipt_kind"]
+          },
+          "then": {
+            "properties": {
+              "accepted_outcome": { "type": "null" },
+              "accepted_outcome_absent_reason": {
+                "const": "NO_ACCEPTED_TERMINAL_OR_NOT_STARTED_RECEIPT"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "accepted_outcome": { "$ref": "#/$defs/accepted_outcome" },
+              "accepted_outcome_absent_reason": { "type": "null" }
+            }
+          }
+        }
+      ],
+      "required": [
+        "work_item_id", "track", "campaign_codename", "campaign_slug",
+        "dependencies", "entry_predicates", "stop_conditions", "scheduler_state",
+        "scheduler_state_recognized", "dependency_terminality", "resource_lock_keys",
+        "active_attempt_id", "adapter_id", "adapter_version", "provider_model_class",
+        "provider_identity", "model_identity", "session_identity", "thread_identity",
+        "turn_identity", "queue_identity", "last_event_sequence", "last_event_digest",
+        "human_questions", "accepted_receipt_kind", "accepted_outcome",
+        "accepted_outcome_absent_reason"
+      ],
+      "properties": {
+        "work_item_id": { "$ref": "#/$defs/short_text" },
+        "track": { "$ref": "#/$defs/short_text" },
+        "campaign_codename": { "$ref": "#/$defs/short_text" },
+        "campaign_slug": { "$ref": "#/$defs/short_text" },
+        "dependencies": { "$ref": "#/$defs/strings" },
+        "entry_predicates": { "$ref": "#/$defs/strings" },
+        "stop_conditions": { "$ref": "#/$defs/strings" },
+        "scheduler_state": { "$ref": "#/$defs/short_text" },
+        "scheduler_state_recognized": { "type": "boolean" },
+        "dependency_terminality": {
+          "type": "object",
+          "maxProperties": 4096,
+          "propertyNames": { "$ref": "#/$defs/short_text" },
+          "additionalProperties": { "type": "boolean" }
+        },
+        "resource_lock_keys": { "$ref": "#/$defs/strings" },
+        "active_attempt_id": { "$ref": "#/$defs/nullable_text" },
+        "adapter_id": { "$ref": "#/$defs/short_text" },
+        "adapter_version": { "$ref": "#/$defs/short_text" },
+        "provider_model_class": { "$ref": "#/$defs/short_text" },
+        "provider_identity": { "$ref": "#/$defs/nullable_text" },
+        "model_identity": { "$ref": "#/$defs/nullable_text" },
+        "session_identity": { "$ref": "#/$defs/nullable_text" },
+        "thread_identity": { "$ref": "#/$defs/nullable_text" },
+        "turn_identity": { "$ref": "#/$defs/nullable_text" },
+        "queue_identity": { "$ref": "#/$defs/nullable_text" },
+        "last_event_sequence": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "null" }
+          ]
+        },
+        "last_event_digest": { "$ref": "#/$defs/nullable_digest" },
+        "human_questions": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": { "$ref": "#/$defs/question" }
+        },
+        "accepted_receipt_kind": {
+          "oneOf": [
+            { "enum": ["terminal", "not_started"] },
+            { "type": "null" }
+          ]
+        },
+        "accepted_outcome": {
+          "oneOf": [
+            { "$ref": "#/$defs/accepted_outcome" },
+            { "type": "null" }
+          ]
+        },
+        "accepted_outcome_absent_reason": {
+          "oneOf": [
+            { "const": "NO_ACCEPTED_TERMINAL_OR_NOT_STARTED_RECEIPT" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "resource_claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resource_lock_key", "work_item_id", "attempt_id"],
+      "properties": {
+        "resource_lock_key": { "$ref": "#/$defs/short_text" },
+        "work_item_id": { "$ref": "#/$defs/short_text" },
+        "attempt_id": { "$ref": "#/$defs/short_text" }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence", "event_id", "work_item_id", "attempt_id", "kind",
+        "recorded_at", "retained_raw_digest", "exact_bytes_sha256", "raw_length"
+      ],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1 },
+        "event_id": { "$ref": "#/$defs/short_text" },
+        "work_item_id": { "$ref": "#/$defs/nullable_text" },
+        "attempt_id": { "$ref": "#/$defs/nullable_text" },
+        "kind": { "$ref": "#/$defs/short_text" },
+        "recorded_at": { "$ref": "#/$defs/time" },
+        "retained_raw_digest": { "$ref": "#/$defs/digest" },
+        "exact_bytes_sha256": { "$ref": "#/$defs/digest" },
+        "raw_length": { "type": "integer", "minimum": 1, "maximum": 16777216 }
+      }
+    },
+    "raw_sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packet_sha256", "admission_sha256", "profile_sha256",
+        "journal_framing_sha256", "accepted_receipts_framing_sha256", "final_snapshot_sha256"
+      ],
+      "properties": {
+        "packet_sha256": { "$ref": "#/$defs/digest" },
+        "admission_sha256": { "$ref": "#/$defs/digest" },
+        "profile_sha256": { "$ref": "#/$defs/digest" },
+        "journal_framing_sha256": { "$ref": "#/$defs/digest" },
+        "accepted_receipts_framing_sha256": { "$ref": "#/$defs/digest" },
+        "final_snapshot_sha256": { "$ref": "#/$defs/nullable_digest" }
+      }
+    },
+    "provider_capacity_requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capacity_requirement_digest", "exact_bytes_sha256", "recorded_at",
+        "policy_id", "provider_id", "model_cost_classes", "authority_effect"
+      ],
+      "properties": {
+        "capacity_requirement_digest": { "$ref": "#/$defs/digest" },
+        "exact_bytes_sha256": { "$ref": "#/$defs/digest" },
+        "recorded_at": { "$ref": "#/$defs/time" },
+        "policy_id": { "$ref": "#/$defs/short_text" },
+        "provider_id": { "$ref": "#/$defs/short_text" },
+        "model_cost_classes": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 16,
+          "propertyNames": { "$ref": "#/$defs/short_text" },
+          "additionalProperties": { "enum": ["CHEAP", "EXPENSIVE"] }
+        },
+        "authority_effect": { "const": "LOCAL_AGENT_COMPUTE_SCHEDULING_ONLY" }
+      }
+    },
+    "provider_capacity_attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journal_sequence", "work_item_id", "attempt_id", "recorded_at",
+        "provider_id", "packet_model_class", "profile_model_class", "cost_class",
+        "capacity_state", "admission_disposition", "source_class", "confidence",
+        "observation_disposition", "observed_at", "expires_at", "decision_at",
+        "evaluated_at", "currentness", "capacity_admission_digest",
+        "observation_digest", "policy_digest", "decision_digest",
+        "admission_exact_bytes_sha256", "observation_exact_bytes_sha256",
+        "policy_exact_bytes_sha256", "decision_exact_bytes_sha256"
+      ],
+      "properties": {
+        "journal_sequence": { "type": "integer", "minimum": 1 },
+        "work_item_id": { "$ref": "#/$defs/short_text" },
+        "attempt_id": { "$ref": "#/$defs/short_text" },
+        "recorded_at": { "$ref": "#/$defs/time" },
+        "provider_id": { "$ref": "#/$defs/short_text" },
+        "packet_model_class": { "$ref": "#/$defs/short_text" },
+        "profile_model_class": { "$ref": "#/$defs/short_text" },
+        "cost_class": { "enum": ["CHEAP", "EXPENSIVE"] },
+        "capacity_state": { "enum": ["ABUNDANT", "NORMAL", "CONSERVE", "CRITICAL", "UNKNOWN"] },
+        "admission_disposition": { "enum": ["ORDINARY_BOUNDED", "CHEAP_BOUNDED_ONLY", "NO_NEW_WORK"] },
+        "source_class": { "enum": ["AUTHORITATIVE", "OBSERVED", "INFERRED", "UNKNOWN"] },
+        "confidence": { "enum": ["UNKNOWN", "LOW", "MEDIUM", "HIGH"] },
+        "observation_disposition": { "enum": ["USABLE", "UNKNOWN"] },
+        "observed_at": { "$ref": "#/$defs/time" },
+        "expires_at": { "$ref": "#/$defs/time" },
+        "decision_at": { "$ref": "#/$defs/time" },
+        "evaluated_at": { "$ref": "#/$defs/time" },
+        "currentness": { "enum": ["NOT_YET_CURRENT", "CURRENT", "EXPIRED"] },
+        "capacity_admission_digest": { "$ref": "#/$defs/digest" },
+        "observation_digest": { "$ref": "#/$defs/digest" },
+        "policy_digest": { "$ref": "#/$defs/digest" },
+        "decision_digest": { "$ref": "#/$defs/digest" },
+        "admission_exact_bytes_sha256": { "$ref": "#/$defs/digest" },
+        "observation_exact_bytes_sha256": { "$ref": "#/$defs/digest" },
+        "policy_exact_bytes_sha256": { "$ref": "#/$defs/digest" },
+        "decision_exact_bytes_sha256": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "provider_capacity": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "requirement", "attempts", "explanation"],
+          "properties": {
+            "status": { "const": "NOT_RECORDED_BY_FOREMAN" },
+            "requirement": { "type": "null" },
+            "attempts": { "type": "array", "maxItems": 0 },
+            "explanation": { "$ref": "#/$defs/text" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "requirement", "attempts", "explanation"],
+          "properties": {
+            "status": { "const": "EXACT_RECORDED_BY_FOREMAN" },
+            "requirement": { "$ref": "#/$defs/provider_capacity_requirement" },
+            "attempts": {
+              "type": "array",
+              "maxItems": 4096,
+              "items": { "$ref": "#/$defs/provider_capacity_attempt" }
+            },
+            "explanation": { "$ref": "#/$defs/text" }
+          }
+        }
+      ]
+    }
+  }
+}

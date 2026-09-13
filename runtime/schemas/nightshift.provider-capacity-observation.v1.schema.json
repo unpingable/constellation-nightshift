@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:provider-capacity-observation:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "provider_id", "account_profile_locator", "model_family", "observed_at", "expires_at", "source_class", "confidence", "disposition", "unknown_reasons", "windows", "evidence", "observation_digest"],
+  "properties": {
+    "schema": {"const": "nightshift.provider-capacity-observation/v1"},
+    "provider_id": {"$ref": "#/$defs/nonempty"},
+    "account_profile_locator": {"$ref": "#/$defs/nonempty"},
+    "model_family": {"type": ["string", "null"], "minLength": 1},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "source_class": {"enum": ["AUTHORITATIVE", "OBSERVED", "INFERRED", "UNKNOWN"]},
+    "confidence": {"enum": ["UNKNOWN", "LOW", "MEDIUM", "HIGH"]},
+    "disposition": {"enum": ["USABLE", "UNKNOWN"]},
+    "unknown_reasons": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/token"}},
+    "windows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["window_id", "window_type", "remaining_fraction", "remaining_units", "resets_at"],
+        "properties": {
+          "window_id": {"$ref": "#/$defs/nonempty"},
+          "window_type": {"enum": ["FIVE_HOUR", "WEEKLY", "PROVIDER_DEFINED"]},
+          "remaining_fraction": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+          "remaining_units": {
+            "oneOf": [
+              {"type": "null"},
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["remaining", "maximum", "unit"],
+                "properties": {
+                  "remaining": {"type": "integer", "minimum": 0},
+                  "maximum": {"type": "integer", "minimum": 1},
+                  "unit": {"$ref": "#/$defs/nonempty"}
+                }
+              }
+            ]
+          },
+          "resets_at": {"type": ["string", "null"], "format": "date-time"}
+        },
+        "anyOf": [
+          {"properties": {"remaining_fraction": {"type": "number"}}},
+          {"properties": {"remaining_units": {"type": "object"}}}
+        ]
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["probe_id", "protocol_method", "protocol_version", "executable_path", "executable_digest", "raw_source_digest"],
+      "properties": {
+        "probe_id": {"$ref": "#/$defs/nonempty"},
+        "protocol_method": {"$ref": "#/$defs/nonempty"},
+        "protocol_version": {"oneOf": [{"$ref": "#/$defs/nonempty"}, {"type": "null"}]},
+        "executable_path": {"oneOf": [{"type": "string", "pattern": "^/"}, {"type": "null"}]},
+        "executable_digest": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+        "raw_source_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "observation_digest": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"disposition": {"const": "USABLE"}}},
+      "then": {
+        "properties": {
+          "unknown_reasons": {"maxItems": 0},
+          "windows": {"minItems": 1},
+          "evidence": {
+            "properties": {
+              "protocol_version": {"$ref": "#/$defs/nonempty"},
+              "executable_path": {"type": "string", "pattern": "^/"},
+              "executable_digest": {"$ref": "#/$defs/digest"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"disposition": {"const": "UNKNOWN"}}},
+      "then": {"properties": {"unknown_reasons": {"minItems": 1}}}
+    }
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "nonempty": {"type": "string", "minLength": 1},
+    "token": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"}
+  }
+}

@@ -7,6 +7,25 @@ If anything here conflicts with the user's explicit instructions, the user wins.
 
 ---
 
+
+## Workspace selection
+
+Use [`runtime/SOURCE-PROVENANCE.json`](runtime/SOURCE-PROVENANCE.json) and the
+[`runtime` custody guide](runtime/docs/BOUNDED_PROVIDER_CUSTODY_V1.md) for the
+source-pinned canonical cycle and Foreman runtime. Build with
+`cargo build --locked --manifest-path runtime/Cargo.toml`. The distributed test
+gate is only:
+
+```
+cargo test --locked --manifest-path runtime/Cargo.toml -p nightshift-foreman
+```
+
+Workspace-wide and Casework tests require fixture inputs not distributed here.
+
+The root-level quick start below describes the preserved predecessor workspace,
+including Diagnostics, Watchbill, Runs, NQ, Liveness, and agenda-keyed Attention.
+Those commands are not aliases for `runtime/`.
+
 ## Role
 
 Night Shift manages admissibility across time. Its job is not to decide whether action is authorized, but to prevent old observations, stale plans, and deferred work from silently becoming current authority.

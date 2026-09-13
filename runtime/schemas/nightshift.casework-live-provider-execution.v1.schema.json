@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unpingable.github.io/nightshift/schemas/nightshift.casework-live-provider-execution.v1.schema.json",
+  "title": "Nightshift read-only live provider execution projection V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema","projection_digest","run_id","packet_digest","evaluated_at","status","requirement","dispatches","dispositions","deferrals","wakes","resumes","resource_transitions","independent_provider_capacity_status","explanation","authority_effect"],
+  "properties": {
+    "schema": {"const":"nightshift.casework-live-provider-execution/v1"},
+    "projection_digest": {"$ref":"#/$defs/digest"},
+    "run_id": {"$ref":"#/$defs/id"},
+    "packet_digest": {"$ref":"#/$defs/digest"},
+    "evaluated_at": {"$ref":"#/$defs/time"},
+    "status": {"enum":["NOT_RECORDED_BY_FOREMAN","EXACT_RECORDED_FOREMAN_HISTORY"]},
+    "requirement": {"oneOf":[{"type":"null"},{"$ref":"#/$defs/requirement"}]},
+    "dispatches": {"type":"array","maxItems":4096,"items":{"$ref":"#/$defs/dispatch"}},
+    "dispositions": {"type":"array","maxItems":4096,"items":{"$ref":"#/$defs/disposition"}},
+    "deferrals": {"type":"array","maxItems":4096,"items":{"$ref":"#/$defs/deferral"}},
+    "wakes": {"type":"array","maxItems":4096,"items":{"$ref":"#/$defs/wake"}},
+    "resumes": {"type":"array","maxItems":4096,"items":{"$ref":"#/$defs/resume"}},
+    "resource_transitions": {"type":"array","maxItems":8192,"items":{"$ref":"#/$defs/resource"}},
+    "independent_provider_capacity_status": {"enum":["NOT_RECORDED_BY_FOREMAN","EXACT_RECORDED_BY_FOREMAN"]},
+    "explanation": {"type":"string","minLength":1,"maxLength":4096},
+    "authority_effect": {"const":"READ_ONLY_MECHANISM_PROJECTION"}
+  },
+  "$defs": {
+    "digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "commit": {"type":"string","pattern":"^[0-9a-f]{40}$"},
+    "id": {"type":"string","minLength":1,"maxLength":1024},
+    "time": {"type":"string","format":"date-time"},
+    "seq": {"type":"integer","minimum":1,"maximum":9007199254740991},
+    "u16": {"type":"integer","minimum":0,"maximum":65535},
+    "u64": {"type":"integer","minimum":0,"maximum":9007199254740991},
+    "nullableTime": {"oneOf":[{"type":"null"},{"$ref":"#/$defs/time"}]},
+    "nullableDigest": {"oneOf":[{"type":"null"},{"$ref":"#/$defs/digest"}]},
+    "identity": {
+      "type":"object","additionalProperties":false,
+      "required":["provider_id","model_id","app_server_session_identity","thread_id","turn_id","first_response_id"],
+      "properties":{"provider_id":{"$ref":"#/$defs/id"},"model_id":{"$ref":"#/$defs/id"},"app_server_session_identity":{"$ref":"#/$defs/id"},"thread_id":{"$ref":"#/$defs/id"},"turn_id":{"$ref":"#/$defs/id"},"first_response_id":{"$ref":"#/$defs/id"}}
+    },
+    "modelSelection": {
+      "type":"object","additionalProperties":false,
+      "required":["provider_id","model_id","model_class"],
+      "properties":{"provider_id":{"$ref":"#/$defs/id"},"model_id":{"$ref":"#/$defs/id"},"model_class":{"$ref":"#/$defs/id"}}
+    },
+    "requirement": {
+      "type":"object","additionalProperties":false,
+      "required":["journal_sequence","requirement_digest","policy_id","policy_digest","provider_id","work_item_model_selections","adapter_id","adapter_protocol","adapter_version","adapter_executable_identity","codex_owner_head","provider_admission_owner_head","provider_admission_schema_sha256","deterministic_fixture_sha256","admitted_at","requirement_exact_bytes_sha256","policy_exact_bytes_sha256","parked_resource_lock_policy","allow_ordered_model_fallback","automatic_semantic_retry","approval_response_authorized","authority_effect"],
+      "properties":{
+        "journal_sequence":{"$ref":"#/$defs/seq"},"requirement_digest":{"$ref":"#/$defs/digest"},"policy_id":{"$ref":"#/$defs/id"},"policy_digest":{"$ref":"#/$defs/digest"},"provider_id":{"$ref":"#/$defs/id"},
+        "work_item_model_selections":{"type":"object","minProperties":1,"maxProperties":1024,"propertyNames":{"$ref":"#/$defs/id"},"additionalProperties":{"type":"array","minItems":1,"maxItems":16,"items":{"$ref":"#/$defs/modelSelection"}}},
+        "adapter_id":{"$ref":"#/$defs/id"},"adapter_protocol":{"$ref":"#/$defs/id"},"adapter_version":{"$ref":"#/$defs/id"},"adapter_executable_identity":{"$ref":"#/$defs/digest"},
+        "codex_owner_head":{"$ref":"#/$defs/commit"},"provider_admission_owner_head":{"$ref":"#/$defs/commit"},"provider_admission_schema_sha256":{"$ref":"#/$defs/digest"},"deterministic_fixture_sha256":{"$ref":"#/$defs/digest"},
+        "admitted_at":{"$ref":"#/$defs/time"},"requirement_exact_bytes_sha256":{"$ref":"#/$defs/digest"},"policy_exact_bytes_sha256":{"$ref":"#/$defs/digest"},
+        "parked_resource_lock_policy":{"enum":["RELEASE_AND_REACQUIRE","RETAIN_WHILE_PARKED"]},"allow_ordered_model_fallback":{"type":"boolean"},"automatic_semantic_retry":{"const":false},"approval_response_authorized":{"const":false},"authority_effect":{"const":"READ_ONLY_MECHANISM_PROJECTION"}
+      }
+    },
+    "dispatch": {
+      "type":"object","additionalProperties":false,
+      "required":["journal_sequence","journal_event_id","journal_exact_bytes_sha256","journal_retained_raw_digest","work_item_id","work_attempt_id","dispatch_occurrence_id","dispatch_ordinal","selected_model_ordinal","provider_id","model_id","model_class","adapter_id","adapter_version","adapter_protocol","adapter_process_occurrence_id","app_server_session_identity","worker_start_request_digest","worker_brief_digest","dispatch_digest","opened_at","start_request_exact_bytes_sha256","dispatch_exact_bytes_sha256","provider_execution_identity_absent_at_start"],
+      "properties":{
+        "journal_sequence":{"$ref":"#/$defs/seq"},"journal_event_id":{"$ref":"#/$defs/id"},"journal_exact_bytes_sha256":{"$ref":"#/$defs/digest"},"journal_retained_raw_digest":{"$ref":"#/$defs/digest"},
+        "work_item_id":{"$ref":"#/$defs/id"},"work_attempt_id":{"$ref":"#/$defs/id"},"dispatch_occurrence_id":{"$ref":"#/$defs/id"},"dispatch_ordinal":{"$ref":"#/$defs/u16"},"selected_model_ordinal":{"$ref":"#/$defs/u16"},
+        "provider_id":{"$ref":"#/$defs/id"},"model_id":{"$ref":"#/$defs/id"},"model_class":{"$ref":"#/$defs/id"},"adapter_id":{"$ref":"#/$defs/id"},"adapter_version":{"$ref":"#/$defs/id"},"adapter_protocol":{"$ref":"#/$defs/id"},
+        "adapter_process_occurrence_id":{"$ref":"#/$defs/id"},"app_server_session_identity":{"$ref":"#/$defs/id"},"worker_start_request_digest":{"$ref":"#/$defs/digest"},"worker_brief_digest":{"$ref":"#/$defs/digest"},"dispatch_digest":{"$ref":"#/$defs/digest"},"opened_at":{"$ref":"#/$defs/time"},"start_request_exact_bytes_sha256":{"$ref":"#/$defs/digest"},"dispatch_exact_bytes_sha256":{"$ref":"#/$defs/digest"},"provider_execution_identity_absent_at_start":{"const":true}
+      }
+    },
+    "disposition": {
+      "type":"object","additionalProperties":false,
+      "required":["journal_sequence","journal_event_id","journal_exact_bytes_sha256","journal_retained_raw_digest","work_item_id","work_attempt_id","dispatch_occurrence_id","dispatch_digest","disposition_digest","reconciles_disposition_digest","provider_id","model_id","availability_state","admission_disposition","mechanism_state","observed_at","evidence_received_at","expires_at","disposition_received_at","currentness","source_identity","source_version","response_created","acquisition_complete","provider_retry_after","provider_request_occurrence_id","provider_execution","mapper_snapshot_schema","mapper_snapshot_digest","approval_response_sent","protected_effect_absent","observation_digest","observation_exact_bytes_sha256","disposition_exact_bytes_sha256"],
+      "properties":{
+        "journal_sequence":{"$ref":"#/$defs/seq"},"journal_event_id":{"$ref":"#/$defs/id"},"journal_exact_bytes_sha256":{"$ref":"#/$defs/digest"},"journal_retained_raw_digest":{"$ref":"#/$defs/digest"},
+        "work_item_id":{"$ref":"#/$defs/id"},"work_attempt_id":{"$ref":"#/$defs/id"},"dispatch_occurrence_id":{"$ref":"#/$defs/id"},"dispatch_digest":{"$ref":"#/$defs/digest"},"disposition_digest":{"$ref":"#/$defs/digest"},"reconciles_disposition_digest":{"$ref":"#/$defs/nullableDigest"},
+        "provider_id":{"$ref":"#/$defs/id"},"model_id":{"$ref":"#/$defs/id"},
+        "availability_state":{"enum":["AVAILABLE","MODEL_AT_CAPACITY","PROVIDER_UNAVAILABLE","RATE_LIMITED","AUTHENTICATION_REFUSED","TRANSPORT_ERROR","PROTOCOL_ERROR","UNKNOWN"]},
+        "admission_disposition":{"enum":["NOT_ADMITTED_MODEL_AT_CAPACITY","NOT_ADMITTED_PROVIDER_UNAVAILABLE","NOT_ADMITTED_RATE_LIMITED","AUTHENTICATION_REFUSED","ADMISSION_INDETERMINATE","EXECUTION_ADMITTED"]},
+        "mechanism_state":{"enum":["PARKED_NOT_ADMITTED","ADMISSION_INDETERMINATE","EXECUTION_ADMITTED","POST_ADMISSION_INTERRUPTED","WAITING_APPROVAL","PROVIDER_COMPLETED"]},
+        "observed_at":{"$ref":"#/$defs/time"},"evidence_received_at":{"$ref":"#/$defs/time"},"expires_at":{"$ref":"#/$defs/time"},"disposition_received_at":{"$ref":"#/$defs/time"},"currentness":{"enum":["NOT_YET_CURRENT","CURRENT","EXPIRED"]},
+        "source_identity":{"$ref":"#/$defs/id"},"source_version":{"$ref":"#/$defs/id"},"response_created":{"type":"boolean"},"acquisition_complete":{"type":"boolean"},"provider_retry_after":{"$ref":"#/$defs/nullableTime"},"provider_request_occurrence_id":{"$ref":"#/$defs/id"},
+        "provider_execution":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/identity"}]},"mapper_snapshot_schema":{"$ref":"#/$defs/id"},"mapper_snapshot_digest":{"$ref":"#/$defs/digest"},"approval_response_sent":{"const":false},"protected_effect_absent":{"const":true},
+        "observation_digest":{"$ref":"#/$defs/digest"},"observation_exact_bytes_sha256":{"$ref":"#/$defs/digest"},"disposition_exact_bytes_sha256":{"$ref":"#/$defs/digest"}
+      }
+    },
+    "deferral": {
+      "type":"object","additionalProperties":false,
+      "required":["journal_sequence","journal_event_id","journal_exact_bytes_sha256","disposition_digest","deferred_dispatch_digest","work_item_id","work_attempt_id","last_dispatch_occurrence_id","provider_id","model_id","selected_model_ordinal","remaining_model_ordinals","refusal_received_at","wake_basis","backoff_ordinal","backoff_seconds","provider_retry_after","wake_at","parked_resource_lock_policy","provider_capacity_released","deferred_exact_bytes_sha256"],
+      "properties":{
+        "journal_sequence":{"$ref":"#/$defs/seq"},"journal_event_id":{"$ref":"#/$defs/id"},"journal_exact_bytes_sha256":{"$ref":"#/$defs/digest"},"disposition_digest":{"$ref":"#/$defs/digest"},"deferred_dispatch_digest":{"$ref":"#/$defs/digest"},
+        "work_item_id":{"$ref":"#/$defs/id"},"work_attempt_id":{"$ref":"#/$defs/id"},"last_dispatch_occurrence_id":{"$ref":"#/$defs/id"},"provider_id":{"$ref":"#/$defs/id"},"model_id":{"$ref":"#/$defs/id"},
+        "selected_model_ordinal":{"$ref":"#/$defs/u16"},"remaining_model_ordinals":{"type":"array","maxItems":16,"items":{"$ref":"#/$defs/u16"}},"refusal_received_at":{"$ref":"#/$defs/time"},"wake_basis":{"enum":["PROVIDER_RETRY_AFTER","POLICY_BACKOFF"]},"backoff_ordinal":{"$ref":"#/$defs/u16"},"backoff_seconds":{"$ref":"#/$defs/u64"},"provider_retry_after":{"$ref":"#/$defs/nullableTime"},"wake_at":{"$ref":"#/$defs/time"},"parked_resource_lock_policy":{"enum":["RELEASE_AND_REACQUIRE","RETAIN_WHILE_PARKED"]},"provider_capacity_released":{"type":"boolean"},"deferred_exact_bytes_sha256":{"$ref":"#/$defs/digest"}
+      }
+    },
+    "wake": {
+      "type":"object","additionalProperties":false,
+      "required":["journal_sequence","journal_event_id","journal_exact_bytes_sha256","work_item_id","work_attempt_id","wake_occurrence_id","deferred_dispatch_digest","next_dispatch_digest","recorded_at"],
+      "properties":{"journal_sequence":{"$ref":"#/$defs/seq"},"journal_event_id":{"$ref":"#/$defs/id"},"journal_exact_bytes_sha256":{"$ref":"#/$defs/digest"},"work_item_id":{"$ref":"#/$defs/id"},"work_attempt_id":{"$ref":"#/$defs/id"},"wake_occurrence_id":{"$ref":"#/$defs/id"},"deferred_dispatch_digest":{"$ref":"#/$defs/digest"},"next_dispatch_digest":{"$ref":"#/$defs/digest"},"recorded_at":{"$ref":"#/$defs/time"}}
+    },
+    "resume": {
+      "type":"object","additionalProperties":false,
+      "required":["journal_sequence","journal_event_id","journal_exact_bytes_sha256","work_item_id","work_attempt_id","resume_occurrence_id","disposition_digest","adapter_process_occurrence_id","execution_identity","recorded_at"],
+      "properties":{"journal_sequence":{"$ref":"#/$defs/seq"},"journal_event_id":{"$ref":"#/$defs/id"},"journal_exact_bytes_sha256":{"$ref":"#/$defs/digest"},"work_item_id":{"$ref":"#/$defs/id"},"work_attempt_id":{"$ref":"#/$defs/id"},"resume_occurrence_id":{"$ref":"#/$defs/id"},"disposition_digest":{"$ref":"#/$defs/digest"},"adapter_process_occurrence_id":{"$ref":"#/$defs/id"},"execution_identity":{"$ref":"#/$defs/identity"},"recorded_at":{"$ref":"#/$defs/time"}}
+    },
+    "resource": {
+      "type":"object","additionalProperties":false,
+      "required":["journal_sequence","journal_event_id","journal_exact_bytes_sha256","transition","work_item_id","work_attempt_id","dispatch_digest","disposition_digest","deferred_dispatch_digest","policy_digest","wake_occurrence_id","resource_lock_keys","recorded_at"],
+      "properties":{"journal_sequence":{"$ref":"#/$defs/seq"},"journal_event_id":{"$ref":"#/$defs/id"},"journal_exact_bytes_sha256":{"$ref":"#/$defs/digest"},"transition":{"enum":["RELEASED","REACQUIRED"]},"work_item_id":{"$ref":"#/$defs/id"},"work_attempt_id":{"$ref":"#/$defs/id"},"dispatch_digest":{"$ref":"#/$defs/digest"},"disposition_digest":{"$ref":"#/$defs/nullableDigest"},"deferred_dispatch_digest":{"$ref":"#/$defs/nullableDigest"},"policy_digest":{"$ref":"#/$defs/digest"},"wake_occurrence_id":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/id"}]},"resource_lock_keys":{"type":"array","maxItems":1024,"items":{"$ref":"#/$defs/id"}},"recorded_at":{"$ref":"#/$defs/time"}},
+      "allOf":[
+        {"if":{"properties":{"transition":{"const":"RELEASED"}}},"then":{"properties":{"disposition_digest":{"$ref":"#/$defs/digest"},"deferred_dispatch_digest":{"type":"null"},"wake_occurrence_id":{"type":"null"}}}},
+        {"if":{"properties":{"transition":{"const":"REACQUIRED"}}},"then":{"properties":{"disposition_digest":{"type":"null"},"deferred_dispatch_digest":{"$ref":"#/$defs/digest"},"wake_occurrence_id":{"$ref":"#/$defs/id"}}}}
+      ]
+    }
+  },
+  "allOf": [
+    {"if":{"properties":{"status":{"const":"NOT_RECORDED_BY_FOREMAN"}}},"then":{"properties":{"requirement":{"type":"null"},"dispatches":{"maxItems":0},"dispositions":{"maxItems":0},"deferrals":{"maxItems":0},"wakes":{"maxItems":0},"resumes":{"maxItems":0},"resource_transitions":{"maxItems":0}}}},
+    {"if":{"properties":{"status":{"const":"EXACT_RECORDED_FOREMAN_HISTORY"}}},"then":{"properties":{"requirement":{"$ref":"#/$defs/requirement"}}}}
+  ]
+}

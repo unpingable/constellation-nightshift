@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:provider-capacity-decision:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "provider_id", "decision_at", "state", "admission", "allow_new_expensive_work", "allow_new_speculative_work", "allow_active_work_to_reach_custody", "reason_codes", "observation_digest", "policy_digest", "decision_digest"],
+  "properties": {
+    "schema": {"const": "nightshift.provider-capacity-decision/v1"},
+    "provider_id": {"type": "string", "minLength": 1},
+    "decision_at": {"type": "string", "format": "date-time"},
+    "state": {"enum": ["ABUNDANT", "NORMAL", "CONSERVE", "CRITICAL", "UNKNOWN"]},
+    "admission": {"enum": ["ORDINARY_BOUNDED", "CHEAP_BOUNDED_ONLY", "NO_NEW_WORK"]},
+    "allow_new_expensive_work": {"type": "boolean"},
+    "allow_new_speculative_work": {"type": "boolean"},
+    "allow_active_work_to_reach_custody": {"const": true},
+    "reason_codes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"}},
+    "observation_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "policy_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "decision_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"state": {"const": "ABUNDANT"}}},
+      "then": {"properties": {"admission": {"const": "ORDINARY_BOUNDED"}, "allow_new_expensive_work": {"const": true}, "allow_new_speculative_work": {"const": true}}}
+    },
+    {
+      "if": {"properties": {"state": {"const": "NORMAL"}}},
+      "then": {"properties": {"admission": {"const": "ORDINARY_BOUNDED"}, "allow_new_expensive_work": {"const": true}, "allow_new_speculative_work": {"const": false}}}
+    },
+    {
+      "if": {"properties": {"state": {"const": "CONSERVE"}}},
+      "then": {"properties": {"admission": {"const": "CHEAP_BOUNDED_ONLY"}, "allow_new_expensive_work": {"const": false}, "allow_new_speculative_work": {"const": false}}}
+    },
+    {
+      "if": {"properties": {"state": {"const": "CRITICAL"}}},
+      "then": {"properties": {"admission": {"const": "NO_NEW_WORK"}, "allow_new_expensive_work": {"const": false}, "allow_new_speculative_work": {"const": false}}}
+    },
+    {
+      "if": {"properties": {"state": {"const": "UNKNOWN"}}},
+      "then": {"properties": {"admission": {"enum": ["CHEAP_BOUNDED_ONLY", "NO_NEW_WORK"]}, "allow_new_expensive_work": {"const": false}, "allow_new_speculative_work": {"const": false}}}
+    }
+  ]
+}

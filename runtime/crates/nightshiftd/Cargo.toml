@@ -1,0 +1,42 @@
+[package]
+name = "nightshiftd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+description = "Nightshift canonical temporal observation and attention runtime"
+autobins = false
+
+[[bin]]
+name = "nightshift"
+path = "src/bin/nightshift.rs"
+
+# Read-only evidence translator for AG's observation-resolution boundary.
+# It has no cycle-mutation, lease, AG, Docket, or executor surface; the
+# exclusivity gate allowlists exactly this binary.
+[[bin]]
+name = "nightshift-observation-resolver"
+path = "src/bin/nightshift_observation_resolver.rs"
+
+[lib]
+name = "nightshiftd"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_jcs.workspace = true
+chrono.workspace = true
+sha2.workspace = true
+rusqlite.workspace = true
+uuid.workspace = true
+tempfile.workspace = true
+libc.workspace = true
+ed25519-dalek.workspace = true
+hex.workspace = true
+
+[dev-dependencies]

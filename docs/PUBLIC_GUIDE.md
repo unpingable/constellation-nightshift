@@ -9,6 +9,28 @@ the AG authority office.
 The public repository is `constellation-nightshift`; the crate, executable,
 store, and protocol names remain unchanged.
 
+
+## Current runtime and predecessor workspace
+
+The additive [`runtime/`](../runtime/) workspace contains the source-pinned
+canonical cycle and Foreman runtime. Its exact inputs are in
+[`SOURCE-PROVENANCE.json`](../runtime/SOURCE-PROVENANCE.json), with operational
+boundaries in the [custody guide](../runtime/docs/BOUNDED_PROVIDER_CUSTODY_V1.md).
+Build it with `cargo build --locked --manifest-path runtime/Cargo.toml`. The only
+distributed runtime test gate is:
+
+```sh
+cargo test --locked --manifest-path runtime/Cargo.toml -p nightshift-foreman
+```
+
+Workspace-wide and Casework tests require fixture inputs not distributed in
+this cut.
+
+The repository-root workspace remains the predecessor command set. Its
+Diagnostics, Watchbill, Runs, NQ, Liveness, and agenda-keyed Attention commands
+are not aliases for `runtime/` and remain available from existing immutable
+revisions.
+
 ## Public main: source build and inspection
 
 This branch is a source workspace, not an installed package. It requires Git,
@@ -51,7 +73,7 @@ current limits, including the optional legacy integration.
 The newer canonical-runtime qualification fixture is published separately at
 [`eb20a7f`](https://github.com/unpingable/constellation-nightshift/tree/eb20a7fe7d3efc478fa17c0e351e2e20febddf5b).
 It records baseline006 with four successful cache settlements using a
-deterministic NQ substitution. That fixture is not a genuine NQ tutorial and
-does not mean this `main` branch contains the canonical runtime or that the
-full publication campaign is complete. Consult that exact revision for its
+deterministic NQ substitution. That fixture is not a genuine NQ tutorial and did not establish current
+runtime availability; `runtime/` is separately source-pinned. It also does
+not establish that a full integration workflow is complete. Consult that exact revision for its
 own source and qualification scope.

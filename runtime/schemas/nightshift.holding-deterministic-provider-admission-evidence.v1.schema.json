@@ -1,0 +1,35 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"urn:nightshift:holding-deterministic-provider-admission-evidence:v1",
+  "title":"Nightshift HOLDING deterministic provider admission evidence V1",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema","evidence_digest","producer_id","producer_version","executable_id","executable_sha256","work_attempt_id","dispatch_occurrence_id","provider_request_occurrence_id","provider_id","model_id","outcome","response_created","non_admission_proven","retry_after","observed_at","received_at","raw_evidence","authority_effect"],
+  "properties":{
+    "schema":{"const":"nightshift.holding-deterministic-provider-admission-evidence/v1"},
+    "evidence_digest":{"$ref":"#/$defs/digest"},
+    "producer_id":{"const":"nightshift:holding-pattern-deterministic-fake-adapter"},
+    "producer_version":{"const":"v1"},
+    "executable_id":{"const":"campaign:holding-pattern:deterministic-fake-adapter:v1"},
+    "executable_sha256":{"const":"sha256:e8a310d46cb40b0aef6399a8da6c97ac99f0fc5eab6a78c5e7007600d5cbfa82"},
+    "work_attempt_id":{"$ref":"#/$defs/id"},
+    "dispatch_occurrence_id":{"$ref":"#/$defs/id"},
+    "provider_request_occurrence_id":{"$ref":"#/$defs/id"},
+    "provider_id":{"$ref":"#/$defs/id"},
+    "model_id":{"$ref":"#/$defs/id"},
+    "outcome":{"enum":["RATE_LIMITED","PROVIDER_UNAVAILABLE","AUTHENTICATION_REFUSED","TRANSPORT_ERROR","PROTOCOL_ERROR"]},
+    "response_created":{"type":"boolean"},
+    "non_admission_proven":{"type":"boolean"},
+    "retry_after":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/time"}]},
+    "observed_at":{"$ref":"#/$defs/time"},
+    "received_at":{"$ref":"#/$defs/time"},
+    "raw_evidence":{"$ref":"#/$defs/raw"},
+    "authority_effect":{"const":"QUALIFICATION_MECHANISM_EVIDENCE_ONLY"}
+  },
+  "$defs":{
+    "digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "id":{"type":"string","minLength":1,"maxLength":512,"pattern":"^[A-Za-z0-9._:/-]+$"},
+    "time":{"type":"string","format":"date-time","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:Z|\\.(?:(?!000)[0-9]{3}|[0-9]{3}(?!000)[0-9]{3}|[0-9]{6}(?!000)[0-9]{3})Z)$"},
+    "raw":{"type":"object","additionalProperties":false,"required":["representation","byte_length","sha256","encoding","bytes_hex"],"properties":{"representation":{"const":"EXACT_PROVIDER_AVAILABILITY_SOURCE_BYTES"},"byte_length":{"type":"integer","minimum":1,"maximum":16384},"sha256":{"$ref":"#/$defs/digest"},"encoding":{"const":"hex"},"bytes_hex":{"type":"string","minLength":2,"maxLength":32768,"pattern":"^[0-9a-f]+$"}}}
+  }
+}

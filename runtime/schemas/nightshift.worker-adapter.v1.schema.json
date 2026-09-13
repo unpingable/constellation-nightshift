@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:worker-adapter:v1",
+  "title": "Nightshift worker adapter V1 records",
+  "oneOf": [
+    {"$ref": "#/$defs/start_request"},
+    {"$ref": "#/$defs/adapter_event"},
+    {"$ref": "#/$defs/terminal_receipt"},
+    {"$ref": "#/$defs/not_started_receipt"}
+  ],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-fA-F]{64}$"},
+    "id": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9._:/-]+$"},
+    "nullable_id": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+    "strings": {"type": "array", "items": {"type": "string", "maxLength": 65536}},
+    "extensions": {"type": "object", "maxProperties": 64},
+    "question": {
+      "type": "object", "additionalProperties": false,
+      "required": ["question_id", "question", "exhausted_evidence", "safe_default", "consequences", "resume_point"],
+      "properties": {
+        "question_id": {"$ref": "#/$defs/id"},
+        "question": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "exhausted_evidence": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "safe_default": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "consequences": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "resume_point": {"type": "string", "minLength": 1, "maxLength": 65536}
+      }
+    },
+    "start_request": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema", "request_digest", "adapter_protocol", "packet_digest", "run_id",
+        "work_item_id", "attempt_id", "worker_brief_digest", "workspace_identity",
+        "provider_model_class", "timeout_seconds", "maximum_output_bytes",
+        "recursive_worker_swarms_forbidden", "approval_policy", "expected_receipt_schema"
+      ],
+      "properties": {
+        "schema": {"const": "nightshift.worker-start-request/v1"},
+        "request_digest": {"$ref": "#/$defs/digest"},
+        "adapter_protocol": {"$ref": "#/$defs/id"},
+        "packet_digest": {"$ref": "#/$defs/digest"},
+        "run_id": {"$ref": "#/$defs/id"},
+        "work_item_id": {"$ref": "#/$defs/id"},
+        "attempt_id": {"$ref": "#/$defs/id"},
+        "worker_brief_digest": {"$ref": "#/$defs/digest"},
+        "workspace_identity": {"$ref": "#/$defs/id"},
+        "provider_model_class": {"$ref": "#/$defs/id"},
+        "timeout_seconds": {"type": "integer", "minimum": 1},
+        "maximum_output_bytes": {"type": "integer", "minimum": 1024},
+        "recursive_worker_swarms_forbidden": {"const": true},
+        "approval_policy": {"const": "SURFACE_ONLY_NO_RESPONSE"},
+        "expected_receipt_schema": {"const": "nightshift.worker-terminal-receipt/v1"}
+      }
+    },
+    "adapter_event": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema", "event_digest", "event_id", "packet_digest", "run_id", "work_item_id",
+        "attempt_id", "adapter_id", "adapter_version", "occurred_at", "kind",
+        "provider_identity", "model_identity", "session_identity", "thread_identity",
+        "turn_identity", "queue_identity", "message", "human_question", "extensions"
+      ],
+      "properties": {
+        "schema": {"const": "nightshift.worker-adapter-event/v1"},
+        "event_digest": {"$ref": "#/$defs/digest"},
+        "event_id": {"$ref": "#/$defs/id"},
+        "packet_digest": {"$ref": "#/$defs/digest"},
+        "run_id": {"$ref": "#/$defs/id"},
+        "work_item_id": {"$ref": "#/$defs/id"},
+        "attempt_id": {"$ref": "#/$defs/id"},
+        "adapter_id": {"$ref": "#/$defs/id"},
+        "adapter_version": {"$ref": "#/$defs/id"},
+        "occurred_at": {"type": "string", "format": "date-time"},
+        "kind": {"enum": ["adapter_accepted", "provider_identity", "worker_started", "checkpoint", "waiting_approval", "human_question", "provider_completion_observation", "adapter_diagnostic", "mechanism_indeterminate"]},
+        "provider_identity": {"$ref": "#/$defs/nullable_id"},
+        "model_identity": {"$ref": "#/$defs/nullable_id"},
+        "session_identity": {"$ref": "#/$defs/nullable_id"},
+        "thread_identity": {"$ref": "#/$defs/nullable_id"},
+        "turn_identity": {"$ref": "#/$defs/nullable_id"},
+        "queue_identity": {"$ref": "#/$defs/nullable_id"},
+        "message": {"oneOf": [{"type": "string", "maxLength": 65536}, {"type": "null"}]},
+        "human_question": {"oneOf": [{"$ref": "#/$defs/question"}, {"type": "null"}]},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "repository": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "branch", "head", "push_status"],
+      "properties": {
+        "repository": {"type": "string"},
+        "branch": {"type": "string"},
+        "head": {"type": "string"},
+        "push_status": {"type": "string"}
+      }
+    },
+    "teardown": {
+      "type": "object", "additionalProperties": false,
+      "required": ["live_runtime", "secrets", "teardown"],
+      "properties": {
+        "live_runtime": {"type": "string"},
+        "secrets": {"type": "string"},
+        "teardown": {"type": "string"}
+      }
+    },
+    "terminal_receipt": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema", "receipt_digest", "packet_digest", "run_id", "work_item_id",
+        "attempt_id", "adapter_id", "adapter_version", "provider_identity", "model_identity",
+        "session_identity", "thread_identity", "turn_identity", "queue_identity",
+        "started_at", "ended_at", "state", "result_classification", "repositories",
+        "tests", "evidence", "live_or_production_mutations", "remaining_trigger",
+        "next_lawful_action", "human_questions", "teardown", "extensions"
+      ],
+      "properties": {
+        "schema": {"const": "nightshift.worker-terminal-receipt/v1"},
+        "receipt_digest": {"$ref": "#/$defs/digest"},
+        "packet_digest": {"$ref": "#/$defs/digest"},
+        "run_id": {"$ref": "#/$defs/id"},
+        "work_item_id": {"$ref": "#/$defs/id"},
+        "attempt_id": {"$ref": "#/$defs/id"},
+        "adapter_id": {"$ref": "#/$defs/id"},
+        "adapter_version": {"$ref": "#/$defs/id"},
+        "provider_identity": {"$ref": "#/$defs/id"},
+        "model_identity": {"$ref": "#/$defs/id"},
+        "session_identity": {"$ref": "#/$defs/nullable_id"},
+        "thread_identity": {"$ref": "#/$defs/nullable_id"},
+        "turn_identity": {"$ref": "#/$defs/nullable_id"},
+        "queue_identity": {"$ref": "#/$defs/nullable_id"},
+        "started_at": {"type": "string", "format": "date-time"},
+        "ended_at": {"type": "string", "format": "date-time"},
+        "state": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "result_classification": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "repositories": {"type": "array", "items": {"$ref": "#/$defs/repository"}},
+        "tests": {"$ref": "#/$defs/strings"},
+        "evidence": {"$ref": "#/$defs/strings"},
+        "live_or_production_mutations": {"$ref": "#/$defs/strings"},
+        "remaining_trigger": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "next_lawful_action": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "human_questions": {"type": "array", "items": {"$ref": "#/$defs/question"}},
+        "teardown": {"$ref": "#/$defs/teardown"},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    },
+    "not_started_receipt": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema", "receipt_digest", "packet_digest", "run_id", "work_item_id",
+        "recorded_at", "state", "result_classification", "evidence", "remaining_trigger",
+        "next_lawful_action", "human_questions", "extensions"
+      ],
+      "properties": {
+        "schema": {"const": "nightshift.work-item-not-started-receipt/v1"},
+        "receipt_digest": {"$ref": "#/$defs/digest"},
+        "packet_digest": {"$ref": "#/$defs/digest"},
+        "run_id": {"$ref": "#/$defs/id"},
+        "work_item_id": {"$ref": "#/$defs/id"},
+        "recorded_at": {"type": "string", "format": "date-time"},
+        "state": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "result_classification": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "evidence": {"$ref": "#/$defs/strings"},
+        "remaining_trigger": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "next_lawful_action": {"type": "string", "minLength": 1, "maxLength": 65536},
+        "human_questions": {"type": "array", "items": {"$ref": "#/$defs/question"}},
+        "extensions": {"$ref": "#/$defs/extensions"}
+      }
+    }
+  }
+}

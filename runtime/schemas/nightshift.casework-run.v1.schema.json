@@ -1,0 +1,691 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unpingable.github.io/nightshift/schemas/nightshift.casework-run.v1.schema.json",
+  "title": "NightshiftCaseworkRunV1",
+  "description": "Closed deterministic read-only projection of one exact orientation packet and run-receipt snapshot. Unknown compatible source values remain only in raw bytes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "projection_digest",
+    "run_id",
+    "packet",
+    "receipts",
+    "summary",
+    "work_items",
+    "human_questions",
+    "final_repository_custody"
+  ],
+  "properties": {
+    "schema": {
+      "const": "nightshift.casework-run/v1"
+    },
+    "projection_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "packet": {
+      "$ref": "#/$defs/packet"
+    },
+    "receipts": {
+      "$ref": "#/$defs/receipts"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "work_items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/workItem"
+      }
+    },
+    "human_questions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/question"
+      }
+    },
+    "final_repository_custody": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finalCustody"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "strings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "compatibleValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recognized_string"
+      ],
+      "properties": {
+        "recognized_string": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "rendererJoinedValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recognized_strings"
+      ],
+      "properties": {
+        "recognized_strings": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "compatibleTimestamp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recognized_string",
+        "recognized_rfc3339"
+      ],
+      "properties": {
+        "recognized_string": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recognized_rfc3339": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "codename",
+        "canonical_slug"
+      ],
+      "properties": {
+        "codename": {
+          "type": "string"
+        },
+        "canonical_slug": {
+          "type": "string"
+        }
+      }
+    },
+    "predecessor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "campaign",
+        "classification",
+        "commit"
+      ],
+      "properties": {
+        "campaign": {
+          "type": "string"
+        },
+        "classification": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        }
+      }
+    },
+    "exactWorkRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_kind",
+        "contract_schema",
+        "repository",
+        "branch",
+        "commit",
+        "path",
+        "proposal_ref"
+      ],
+      "properties": {
+        "contract_kind": {
+          "type": "string"
+        },
+        "contract_schema": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "proposal_ref": {
+          "type": "string"
+        }
+      }
+    },
+    "modelRouting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "reason",
+        "maximum_mutating_workers"
+      ],
+      "properties": {
+        "class": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "maximum_mutating_workers": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      }
+    },
+    "resultRepository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "branch",
+        "head",
+        "push_status"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "head": {
+          "type": "string"
+        },
+        "push_status": {
+          "type": "string"
+        }
+      }
+    },
+    "renderedRepositories": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recognized_rows"
+      ],
+      "properties": {
+        "recognized_rows": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/resultRepository"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "result_classification",
+        "repositories",
+        "tests",
+        "evidence",
+        "live_or_production_mutations",
+        "remaining_trigger",
+        "next_lawful_action"
+      ],
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "result_classification": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "repositories": {
+          "$ref": "#/$defs/renderedRepositories"
+        },
+        "tests": {
+          "$ref": "#/$defs/rendererJoinedValue"
+        },
+        "evidence": {
+          "$ref": "#/$defs/rendererJoinedValue"
+        },
+        "live_or_production_mutations": {
+          "$ref": "#/$defs/rendererJoinedValue"
+        },
+        "remaining_trigger": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "next_lawful_action": {
+          "$ref": "#/$defs/compatibleValue"
+        }
+      }
+    },
+    "workItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "derived_id",
+        "id",
+        "track",
+        "campaign",
+        "predecessor_lineage",
+        "dependencies",
+        "exact_work_refs",
+        "entry_predicates",
+        "allowed_mutation_surfaces",
+        "forbidden_actions",
+        "acceptance_tests",
+        "stop_conditions",
+        "expected_receipts",
+        "closeout_requirements",
+        "model_routing",
+        "outcome"
+      ],
+      "properties": {
+        "derived_id": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "id": {
+          "type": "string"
+        },
+        "track": {
+          "type": "string"
+        },
+        "campaign": {
+          "$ref": "#/$defs/campaign"
+        },
+        "predecessor_lineage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/predecessor"
+          }
+        },
+        "dependencies": {
+          "$ref": "#/$defs/strings"
+        },
+        "exact_work_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exactWorkRef"
+          }
+        },
+        "entry_predicates": {
+          "$ref": "#/$defs/strings"
+        },
+        "allowed_mutation_surfaces": {
+          "$ref": "#/$defs/strings"
+        },
+        "forbidden_actions": {
+          "$ref": "#/$defs/strings"
+        },
+        "acceptance_tests": {
+          "$ref": "#/$defs/strings"
+        },
+        "stop_conditions": {
+          "$ref": "#/$defs/strings"
+        },
+        "expected_receipts": {
+          "$ref": "#/$defs/strings"
+        },
+        "closeout_requirements": {
+          "$ref": "#/$defs/strings"
+        },
+        "model_routing": {
+          "$ref": "#/$defs/modelRouting"
+        },
+        "outcome": {
+          "$ref": "#/$defs/outcome"
+        }
+      }
+    },
+    "startingCustody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "derived_id",
+        "repository",
+        "path",
+        "branch",
+        "commit",
+        "remote",
+        "remote_commit",
+        "worktree_clean",
+        "discrepancy"
+      ],
+      "properties": {
+        "derived_id": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "remote": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "remote_commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "worktree_clean": {
+          "type": "boolean"
+        },
+        "discrepancy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "finalCustody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "derived_id",
+        "navigation_id",
+        "source_ordinal",
+        "repository",
+        "branch_head",
+        "push_custody",
+        "dirty",
+        "live_runtime",
+        "secrets",
+        "teardown"
+      ],
+      "properties": {
+        "derived_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "repository": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "branch_head": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "push_custody": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "dirty": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "live_runtime": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "secrets": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "teardown": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "navigation_id": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "packet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packet_id",
+        "packet_digest",
+        "created_at",
+        "current_until",
+        "source_bytes_digest",
+        "integrity",
+        "currentness_at_receipt_snapshot",
+        "currentness_evaluated_at",
+        "currentness_now",
+        "repository_custody"
+      ],
+      "properties": {
+        "packet_id": {
+          "type": "string"
+        },
+        "packet_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "current_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_bytes_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "integrity": {
+          "const": "VALID_PACKET_INTEGRITY"
+        },
+        "currentness_at_receipt_snapshot": {
+          "enum": [
+            "NOT_YET_CURRENT",
+            "CURRENT",
+            "EXPIRED",
+            "UNAVAILABLE"
+          ]
+        },
+        "currentness_evaluated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "currentness_now": {
+          "enum": [
+            "NOT_YET_CURRENT",
+            "CURRENT",
+            "EXPIRED"
+          ]
+        },
+        "repository_custody": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/startingCustody"
+          }
+        }
+      }
+    },
+    "receipts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "updated_at",
+        "source_bytes_digest",
+        "validation"
+      ],
+      "properties": {
+        "schema": {
+          "const": "nightshift.run-receipts/v1"
+        },
+        "updated_at": {
+          "$ref": "#/$defs/compatibleTimestamp"
+        },
+        "source_bytes_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "validation": {
+          "const": "VALID_RENDERER_COMPATIBLE_RECEIPT_SNAPSHOT"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "work_item_count",
+        "state_counts",
+        "unrecognized_state_count",
+        "human_question_count",
+        "packet_custody_discrepancy_count"
+      ],
+      "properties": {
+        "work_item_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "state_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "unrecognized_state_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "human_question_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "packet_custody_discrepancy_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "derived_id",
+        "navigation_id",
+        "source_ordinal",
+        "work_item",
+        "linked_work_item",
+        "exact_question",
+        "evidence_exhausted",
+        "safe_default",
+        "consequences",
+        "resume_point"
+      ],
+      "properties": {
+        "derived_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "navigation_id": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "source_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "work_item": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "exact_question": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "evidence_exhausted": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "safe_default": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "consequences": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "resume_point": {
+          "$ref": "#/$defs/compatibleValue"
+        },
+        "linked_work_item": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

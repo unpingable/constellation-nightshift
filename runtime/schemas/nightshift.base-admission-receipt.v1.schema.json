@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:base-admission-receipt:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "receipt_digest",
+    "evaluated_at",
+    "repository",
+    "candidate_base_head",
+    "predecessors",
+    "checks",
+    "integration",
+    "overall_disposition",
+    "principle",
+    "nonclaims"
+  ],
+  "properties": {
+    "schema": {"const": "nightshift.base-admission-receipt/v1"},
+    "receipt_digest": {"$ref": "#/$defs/digest"},
+    "evaluated_at": {"type": "string", "format": "date-time"},
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "remote"],
+      "properties": {
+        "name": {"$ref": "#/$defs/token"},
+        "remote": {"type": "string", "minLength": 1}
+      }
+    },
+    "candidate_base_head": {"$ref": "#/$defs/commit"},
+    "predecessors": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "campaign",
+          "result_head",
+          "qualified_subject_commits",
+          "successor_base_policy"
+        ],
+        "properties": {
+          "campaign": {"$ref": "#/$defs/token"},
+          "result_head": {"$ref": "#/$defs/commit"},
+          "qualified_subject_commits": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/commit"}
+          },
+          "successor_base_policy": {
+            "enum": ["exact_result_ancestry", "exact_subject_ancestry"]
+          }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["campaign", "result_head", "disposition", "evidence"],
+        "properties": {
+          "campaign": {"$ref": "#/$defs/token"},
+          "result_head": {"$ref": "#/$defs/commit"},
+          "disposition": {
+            "enum": [
+              "EXACT-RESULT-ANCESTRY",
+              "EXACT-SUBJECT-ANCESTRY",
+              "VERIFIED-CONTENT-EQUIVALENCE",
+              "DIVERGED-UNRESOLVED"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "integration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "head",
+        "parents",
+        "history_rewritten",
+        "default_branch_mutated"
+      ],
+      "properties": {
+        "head": {"$ref": "#/$defs/commit"},
+        "parents": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/commit"}
+        },
+        "history_rewritten": {"const": false},
+        "default_branch_mutated": {"const": false}
+      }
+    },
+    "overall_disposition": {
+      "enum": [
+        "EXACT-RESULT-ANCESTRY",
+        "EXACT-SUBJECT-ANCESTRY",
+        "VERIFIED-CONTENT-EQUIVALENCE",
+        "DIVERGED-UNRESOLVED"
+      ]
+    },
+    "principle": {
+      "const": "Qualification attaches to the exact subject it qualified. Repository ancestry establishes custody lineage. Content equivalence establishes implementation provenance. None may silently stand in for another."
+    },
+    "nonclaims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "token": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"}
+  }
+}

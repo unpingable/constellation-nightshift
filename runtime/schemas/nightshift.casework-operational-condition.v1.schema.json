@@ -1,0 +1,391 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:casework-operational-condition:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "projection_digest",
+    "navigation_id",
+    "subject",
+    "subject_identity_digest",
+    "producer",
+    "producer_identity_digest",
+    "acquisition_outcome",
+    "lineage",
+    "evaluation",
+    "profile",
+    "questions",
+    "raw_sources",
+    "authority_effect"
+  ],
+  "properties": {
+    "schema": {
+      "const": "nightshift.casework-operational-condition/v1"
+    },
+    "projection_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "navigation_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "subject": {
+      "$ref": "urn:nightshift:operational-observation-lineage:v1#/properties/subject"
+    },
+    "subject_identity_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "producer": {
+      "$ref": "urn:nightshift:operational-observation-lineage:v1#/properties/producer"
+    },
+    "producer_identity_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "acquisition_outcome": {
+      "$ref": "urn:nightshift:operational-observation-lineage:v1#/properties/acquisition_outcome"
+    },
+    "lineage": {
+      "$ref": "urn:nightshift:operational-observation-lineage:v1"
+    },
+    "evaluation": {
+      "$ref": "urn:nightshift:operational-reobservation-evaluation:v1"
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "max_age_seconds"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^[\\u0021-\\u007E]+$(?![\\s\\S])"
+        },
+        "max_age_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2678400
+        }
+      }
+    },
+    "questions": {
+      "type": "array",
+      "maxItems": 192,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "navigation_id",
+          "question_id",
+          "question",
+          "source_index",
+          "source",
+          "next_lawful_action",
+          "presentation_only"
+        ],
+        "properties": {
+          "navigation_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "question_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "source_index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 63
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "source_kind",
+                  "finding"
+                ],
+                "properties": {
+                  "source_kind": {
+                    "const": "cannot_testify"
+                  },
+                  "finding": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "claim_id",
+                      "reason"
+                    ],
+                    "properties": {
+                      "claim_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024,
+                        "pattern": "^[\\u0021-\\u007E]+$(?![\\s\\S])"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "source_kind",
+                  "finding"
+                ],
+                "properties": {
+                  "source_kind": {
+                    "const": "refusal"
+                  },
+                  "finding": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "code",
+                      "exact_basis_digest",
+                      "detail"
+                    ],
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024,
+                        "pattern": "^[\\u0021-\\u007E]+$(?![\\s\\S])"
+                      },
+                      "exact_basis_digest": {
+                        "type": "string",
+                        "pattern": "^sha256:[0-9a-f]{64}$"
+                      },
+                      "detail": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "source_kind",
+                  "finding"
+                ],
+                "properties": {
+                  "source_kind": {
+                    "const": "contradiction"
+                  },
+                  "finding": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "subject_identity_digest",
+                      "claim_id",
+                      "first_input_id",
+                      "first_value_digest",
+                      "second_input_id",
+                      "second_value_digest"
+                    ],
+                    "properties": {
+                      "subject_identity_digest": {
+                        "type": "string",
+                        "pattern": "^sha256:[0-9a-f]{64}$"
+                      },
+                      "claim_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024,
+                        "pattern": "^[\\u0021-\\u007E]+$(?![\\s\\S])"
+                      },
+                      "first_input_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024,
+                        "pattern": "^[\\u0021-\\u007E]+$(?![\\s\\S])"
+                      },
+                      "first_value_digest": {
+                        "type": "string",
+                        "pattern": "^sha256:[0-9a-f]{64}$"
+                      },
+                      "second_input_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024,
+                        "pattern": "^[\\u0021-\\u007E]+$(?![\\s\\S])"
+                      },
+                      "second_value_digest": {
+                        "type": "string",
+                        "pattern": "^sha256:[0-9a-f]{64}$"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "next_lawful_action": {
+            "enum": [
+              "await_currentness_change",
+              "request_reobservation",
+              "request_qualification_review"
+            ]
+          },
+          "presentation_only": {
+            "const": true
+          }
+        }
+      }
+    },
+    "raw_sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "monitor",
+        "nq",
+        "lineage",
+        "profile",
+        "evaluation"
+      ],
+      "properties": {
+        "monitor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "exact_bytes_sha256",
+            "exact_bytes_length",
+            "validation"
+          ],
+          "properties": {
+            "exact_bytes_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "exact_bytes_length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1048576
+            },
+            "validation": {
+              "const": "exact_owner_contract_valid"
+            }
+          }
+        },
+        "nq": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "exact_bytes_sha256",
+            "exact_bytes_length",
+            "validation"
+          ],
+          "properties": {
+            "exact_bytes_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "exact_bytes_length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1048576
+            },
+            "validation": {
+              "const": "exact_owner_contract_valid"
+            }
+          }
+        },
+        "lineage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "exact_bytes_sha256",
+            "exact_bytes_length",
+            "validation"
+          ],
+          "properties": {
+            "exact_bytes_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "exact_bytes_length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1048576
+            },
+            "validation": {
+              "const": "exact_owner_contract_valid"
+            }
+          }
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "exact_bytes_sha256",
+            "exact_bytes_length",
+            "validation"
+          ],
+          "properties": {
+            "exact_bytes_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "exact_bytes_length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1048576
+            },
+            "validation": {
+              "const": "exact_owner_contract_valid"
+            }
+          }
+        },
+        "evaluation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "exact_bytes_sha256",
+            "exact_bytes_length",
+            "validation"
+          ],
+          "properties": {
+            "exact_bytes_sha256": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            },
+            "exact_bytes_length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1048576
+            },
+            "validation": {
+              "const": "exact_owner_contract_valid"
+            }
+          }
+        }
+      }
+    },
+    "authority_effect": {
+      "const": "read_only_projection_no_authority"
+    }
+  }
+}

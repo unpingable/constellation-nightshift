@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:operational-reobservation-evaluation:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "evaluation_id",
+    "lineage_id",
+    "profile_id",
+    "profile_digest",
+    "max_age_seconds",
+    "evaluated_at",
+    "current_until",
+    "exact_supported_claim_ids",
+    "disposition",
+    "reobservation_trigger",
+    "next_lawful_action",
+    "grants_authority"
+  ],
+  "properties": {
+    "schema": {
+      "const": "nightshift.operational-reobservation-evaluation/v1"
+    },
+    "evaluation_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "lineage_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^[\\u0021-\\u007E]+$(?![\\s\\S])"
+    },
+    "profile_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "max_age_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2678400
+    },
+    "evaluated_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "current_until": {
+      "oneOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "exact_supported_claim_ids": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024,
+        "pattern": "^[\\u0021-\\u007E]+$(?![\\s\\S])"
+      }
+    },
+    "disposition": {
+      "enum": [
+        "current",
+        "stale",
+        "acquisition_failure",
+        "cannot_testify",
+        "refused",
+        "contradictory"
+      ]
+    },
+    "reobservation_trigger": {
+      "enum": [
+        "none",
+        "max_age_elapsed",
+        "acquisition_failure",
+        "no_supported_claims",
+        "qualification_refusal",
+        "claim_contradiction"
+      ]
+    },
+    "next_lawful_action": {
+      "enum": [
+        "await_currentness_change",
+        "request_reobservation",
+        "request_qualification_review"
+      ]
+    },
+    "grants_authority": {
+      "const": false
+    }
+  }
+}

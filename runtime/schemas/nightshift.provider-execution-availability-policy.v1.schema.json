@@ -1,0 +1,17 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"urn:nightshift:provider-execution-availability-policy:v1",
+  "title":"Nightshift provider execution availability policy V1",
+  "type":"object","additionalProperties":false,
+  "required":["schema","policy_digest","policy_id","maximum_dispatch_occurrences_per_attempt","backoff_seconds","maximum_total_deferral_seconds","parked_resource_lock_policy","provider_capacity_released_while_parked","reconcile_indeterminate","allow_ordered_model_fallback","automatic_semantic_retry","approval_response_authorized","authority_effect"],
+  "properties":{
+    "schema":{"const":"nightshift.provider-execution-availability-policy/v1"},"policy_digest":{"$ref":"#/$defs/digest"},"policy_id":{"$ref":"#/$defs/id"},
+    "maximum_dispatch_occurrences_per_attempt":{"type":"integer","minimum":1,"maximum":16},
+    "backoff_seconds":{"type":"array","minItems":1,"maxItems":16,"items":{"type":"integer","minimum":1,"maximum":86400}},
+    "maximum_total_deferral_seconds":{"type":"integer","minimum":1,"maximum":604800},
+    "parked_resource_lock_policy":{"enum":["RELEASE_AND_REACQUIRE","RETAIN_WHILE_PARKED"]},
+    "provider_capacity_released_while_parked":{"const":true},"reconcile_indeterminate":{"const":true},"allow_ordered_model_fallback":{"type":"boolean"},
+    "automatic_semantic_retry":{"const":false},"approval_response_authorized":{"const":false},"authority_effect":{"const":"LOCAL_AGENT_COMPUTE_SCHEDULING_ONLY"}
+  },
+  "$defs":{"digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"id":{"type":"string","minLength":1,"maxLength":512,"pattern":"^[A-Za-z0-9._:/-]+$"}}
+}

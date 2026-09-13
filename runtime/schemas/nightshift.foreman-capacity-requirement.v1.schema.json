@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nightshift.invalid/schemas/nightshift.foreman-capacity-requirement.v1.schema.json",
+  "title": "Nightshift Foreman Capacity Requirement V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "capacity_requirement_digest", "packet_digest", "admission_digest", "profile_digest", "run_id", "policy_id", "provider_id", "model_cost_classes", "authority_effect"],
+  "properties": {
+    "schema": {"const": "nightshift.foreman-capacity-requirement/v1"},
+    "capacity_requirement_digest": {"$ref": "#/$defs/digest"},
+    "packet_digest": {"$ref": "#/$defs/digest"},
+    "admission_digest": {"$ref": "#/$defs/digest"},
+    "profile_digest": {"$ref": "#/$defs/digest"},
+    "run_id": {"$ref": "#/$defs/id"},
+    "policy_id": {"$ref": "#/$defs/id"},
+    "provider_id": {"$ref": "#/$defs/id"},
+    "model_cost_classes": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 4,
+      "additionalProperties": false,
+      "properties": {
+        "small": {"const": "CHEAP"},
+        "bounded": {"const": "CHEAP"},
+        "medium": {"const": "EXPENSIVE"},
+        "large": {"const": "EXPENSIVE"}
+      }
+    },
+    "authority_effect": {"const": "LOCAL_AGENT_COMPUTE_SCHEDULING_ONLY"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^sha256:[0-9A-Fa-f]{64}$"},
+    "id": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9._:/-]+$"}
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:self-hosted-foreman-driver-step:v1",
+  "title": "Nightshift self-hosted foreman driver step V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "step_digest",
+    "bootstrap_digest",
+    "bootstrap_occurrence_id",
+    "run_id",
+    "step_ordinal",
+    "scheduler_process_occurrence_id",
+    "observed_projection_digest",
+    "disposition",
+    "recorded_at",
+    "worker_dispatch_authorized",
+    "approval_response_authorized",
+    "protected_effect_authorized",
+    "semantic_retry_authorized",
+    "aggregate_result_created"
+  ],
+  "properties": {
+    "schema": {"const": "nightshift.self-hosted-foreman-driver-step/v1"},
+    "step_digest": {"$ref": "#/$defs/digest"},
+    "bootstrap_digest": {"$ref": "#/$defs/digest"},
+    "bootstrap_occurrence_id": {"$ref": "#/$defs/id"},
+    "run_id": {"$ref": "#/$defs/id"},
+    "step_ordinal": {"type": "integer", "minimum": 1, "maximum": 1000000},
+    "scheduler_process_occurrence_id": {"$ref": "#/$defs/id"},
+    "observed_projection_digest": {"$ref": "#/$defs/digest"},
+    "disposition": {
+      "enum": [
+        "READY_WORK_PRESENT",
+        "WAITING_FOR_EXACT_OWNER_EVIDENCE",
+        "ALL_ITEMS_EXPLICIT_TERMINAL",
+        "BOUND_REACHED"
+      ]
+    },
+    "recorded_at": {"$ref": "#/$defs/time"},
+    "worker_dispatch_authorized": {"const": false},
+    "approval_response_authorized": {"const": false},
+    "protected_effect_authorized": {"const": false},
+    "semantic_retry_authorized": {"const": false},
+    "aggregate_result_created": {"const": false}
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9._:/-]+$"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:Z|\\.(?:(?!000)[0-9]{3}|[0-9]{3}(?!000)[0-9]{3}|[0-9]{6}(?!000)[0-9]{3})Z)$"
+    }
+  }
+}

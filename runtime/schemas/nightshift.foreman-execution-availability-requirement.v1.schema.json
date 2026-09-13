@@ -1,0 +1,19 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"urn:nightshift:foreman-execution-availability-requirement:v1",
+  "title":"Nightshift foreman execution availability requirement V1",
+  "type":"object","additionalProperties":false,
+  "required":["schema","requirement_digest","packet_digest","admission_digest","profile_digest","run_id","adapter_id","adapter_protocol","adapter_version","adapter_executable_identity","owner_pins","policy_id","policy_digest","work_item_model_selections","admitted_at","authority_effect"],
+  "properties":{
+    "schema":{"const":"nightshift.foreman-execution-availability-requirement/v1"},"requirement_digest":{"$ref":"#/$defs/digest"},"packet_digest":{"$ref":"#/$defs/digest"},"admission_digest":{"$ref":"#/$defs/digest"},"profile_digest":{"$ref":"#/$defs/digest"},
+    "run_id":{"$ref":"#/$defs/id"},"adapter_id":{"$ref":"#/$defs/id"},"adapter_protocol":{"$ref":"#/$defs/id"},"adapter_version":{"$ref":"#/$defs/id"},"adapter_executable_identity":{"$ref":"#/$defs/digest"},
+    "owner_pins":{"$ref":"#/$defs/pins"},"policy_id":{"$ref":"#/$defs/id"},"policy_digest":{"$ref":"#/$defs/digest"},
+    "work_item_model_selections":{"type":"object","minProperties":1,"maxProperties":1024,"propertyNames":{"$ref":"#/$defs/id"},"additionalProperties":{"type":"array","minItems":1,"maxItems":16,"items":{"$ref":"#/$defs/selection"}}},
+    "admitted_at":{"$ref":"#/$defs/time"},"authority_effect":{"const":"LOCAL_AGENT_COMPUTE_SCHEDULING_ONLY"}
+  },
+  "$defs":{
+    "digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"commit":{"type":"string","pattern":"^[0-9a-f]{40}$"},"id":{"type":"string","minLength":1,"maxLength":512,"pattern":"^[A-Za-z0-9._:/-]+$"},"time":{"type":"string","format":"date-time","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:Z|\\.(?:(?!000)[0-9]{3}|[0-9]{3}(?!000)[0-9]{3}|[0-9]{6}(?!000)[0-9]{3})Z)$"},
+    "pins":{"type":"object","additionalProperties":false,"required":["codex_owner_head","switchyard_owner_head","switchyard_schema_sha256","deterministic_fixture_sha256"],"properties":{"codex_owner_head":{"type":"string"},"switchyard_owner_head":{"type":"string"},"switchyard_schema_sha256":{"type":"string"},"deterministic_fixture_sha256":{"const":"sha256:cafa673ac58f60029fd6c1de229b4f57d9f42ba918b7ecb2a3bfb20cb2b41a31"}},"oneOf":[{"properties":{"codex_owner_head":{"const":"c36a8137638decf8b04a49611354a90f32c5a945"},"switchyard_owner_head":{"const":"2ba25db66d8b29dd215bd87e05f4ea794024b3b7"},"switchyard_schema_sha256":{"const":"sha256:131f1f6e0cf8cb0aea26ed225c584440c81ffedd443c68ace23adecbe493cf93"},"deterministic_fixture_sha256":{"const":"sha256:cafa673ac58f60029fd6c1de229b4f57d9f42ba918b7ecb2a3bfb20cb2b41a31"}}},{"properties":{"codex_owner_head":{"const":"97b0acd5ce2ccb3c87a763606696c35a450947f6"},"switchyard_owner_head":{"const":"8479cb77dc76632e64b66e84c4f75c9765e421a6"},"switchyard_schema_sha256":{"const":"sha256:4e4eac904735c570f3fe7332765fffe4608cc3987fee9c1ef4b8db3ffdf03376"}}}]},
+    "selection":{"type":"object","additionalProperties":false,"required":["provider_id","model_id","model_class"],"properties":{"provider_id":{"$ref":"#/$defs/id"},"model_id":{"$ref":"#/$defs/id"},"model_class":{"$ref":"#/$defs/id"}}}
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"urn:nightshift:deferred-provider-dispatch:v1",
+  "title":"Nightshift deferred provider dispatch V1",
+  "type":"object","additionalProperties":false,
+  "required":["schema","deferred_dispatch_digest","requirement_digest","policy_digest","disposition_digest","packet_digest","run_id","work_item_id","work_attempt_id","last_dispatch_occurrence_id","provider_id","model_id","selected_model_ordinal","remaining_model_ordinals","refusal_received_at","wake_basis","backoff_ordinal","backoff_seconds","provider_retry_after","wake_at","parked_resource_lock_policy","provider_capacity_released","semantic_retry","authority_effect"],
+  "properties":{
+    "schema":{"const":"nightshift.deferred-provider-dispatch/v1"},"deferred_dispatch_digest":{"$ref":"#/$defs/digest"},"requirement_digest":{"$ref":"#/$defs/digest"},"policy_digest":{"$ref":"#/$defs/digest"},"disposition_digest":{"$ref":"#/$defs/digest"},"packet_digest":{"$ref":"#/$defs/digest"},
+    "run_id":{"$ref":"#/$defs/id"},"work_item_id":{"$ref":"#/$defs/id"},"work_attempt_id":{"$ref":"#/$defs/id"},"last_dispatch_occurrence_id":{"$ref":"#/$defs/id"},"provider_id":{"$ref":"#/$defs/id"},"model_id":{"$ref":"#/$defs/id"},"selected_model_ordinal":{"type":"integer","minimum":0,"maximum":15},"remaining_model_ordinals":{"type":"array","maxItems":16,"uniqueItems":true,"items":{"type":"integer","minimum":0,"maximum":15}},
+    "refusal_received_at":{"$ref":"#/$defs/time"},"wake_basis":{"enum":["PROVIDER_RETRY_AFTER","POLICY_BACKOFF"]},"backoff_ordinal":{"type":"integer","minimum":0,"maximum":15},"backoff_seconds":{"type":"integer","minimum":1,"maximum":86400},"provider_retry_after":{"oneOf":[{"type":"null"},{"$ref":"#/$defs/time"}]},"wake_at":{"$ref":"#/$defs/time"},"parked_resource_lock_policy":{"enum":["RELEASE_AND_REACQUIRE","RETAIN_WHILE_PARKED"]},"provider_capacity_released":{"const":true},"semantic_retry":{"const":false},"authority_effect":{"const":"LOCAL_AGENT_COMPUTE_SCHEDULING_ONLY"}
+  },
+  "$defs":{"digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"id":{"type":"string","minLength":1,"maxLength":512,"pattern":"^[A-Za-z0-9._:/-]+$"},"time":{"type":"string","format":"date-time","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:Z|\\.(?:(?!000)[0-9]{3}|[0-9]{3}(?!000)[0-9]{3}|[0-9]{6}(?!000)[0-9]{3})Z)$"}}
+}

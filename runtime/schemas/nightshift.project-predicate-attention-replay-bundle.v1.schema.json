@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "nightshift.project-predicate-attention-replay-bundle/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policy", "history", "receipt"],
+  "properties": {
+    "schema": {"const": "nightshift.project-predicate-attention-replay-bundle/v1"},
+    "policy": {"type": "object"},
+    "history": {"type": "array", "items": {"type": "object"}},
+    "receipt": {"type": "object"}
+  }
+}

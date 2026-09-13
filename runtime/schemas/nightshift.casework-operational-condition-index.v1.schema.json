@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:casework-operational-condition-index:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "conditions"
+  ],
+  "properties": {
+    "schema": {
+      "const": "nightshift.casework-operational-condition-index/v1"
+    },
+    "conditions": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "navigation_id",
+          "projection_digest",
+          "lineage_id",
+          "evaluation_id",
+          "subject_kind",
+          "subject_namespace",
+          "subject_identity_digest",
+          "disposition",
+          "reobservation_trigger",
+          "evaluated_at",
+          "question_count"
+        ],
+        "properties": {
+          "navigation_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "projection_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "lineage_id": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "evaluation_id": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "subject_kind": {
+            "enum": [
+              "host",
+              "service_instance",
+              "deployment_release",
+              "repository_revision",
+              "scheduler_job",
+              "ecad_design_revision",
+              "toolchain",
+              "pdk",
+              "license_entitlement",
+              "worker",
+              "artifact_set",
+              "stage_occurrence"
+            ]
+          },
+          "subject_namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^[\\u0021-\\u007E]+$(?![\\s\\S])"
+          },
+          "subject_identity_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "disposition": {
+            "enum": [
+              "current",
+              "stale",
+              "acquisition_failure",
+              "cannot_testify",
+              "refused",
+              "contradictory"
+            ]
+          },
+          "reobservation_trigger": {
+            "enum": [
+              "none",
+              "max_age_elapsed",
+              "acquisition_failure",
+              "no_supported_claims",
+              "qualification_refusal",
+              "claim_contradiction"
+            ]
+          },
+          "evaluated_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          },
+          "question_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 192
+          }
+        }
+      }
+    }
+  }
+}

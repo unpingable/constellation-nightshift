@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nightshift:provider-capacity-policy:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policy_id", "abundant_min_remaining", "normal_min_remaining", "conserve_min_remaining", "minimum_confidence", "required_window_types", "unknown_allows_new_cheap_work", "policy_digest"],
+  "properties": {
+    "schema": {"const": "nightshift.provider-capacity-policy/v1"},
+    "policy_id": {"type": "string", "minLength": 1},
+    "abundant_min_remaining": {"type": "number", "minimum": 0, "maximum": 1},
+    "normal_min_remaining": {"type": "number", "minimum": 0, "maximum": 1},
+    "conserve_min_remaining": {"type": "number", "minimum": 0, "maximum": 1},
+    "minimum_confidence": {"enum": ["UNKNOWN", "LOW", "MEDIUM", "HIGH"]},
+    "required_window_types": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"enum": ["FIVE_HOUR", "WEEKLY", "PROVIDER_DEFINED"]}
+    },
+    "unknown_allows_new_cheap_work": {"type": "boolean"},
+    "policy_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
