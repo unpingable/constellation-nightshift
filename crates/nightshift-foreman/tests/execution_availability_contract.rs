@@ -1558,7 +1558,14 @@ fn exact_switchyard_owner_terminal_transition_corpus_reopens() {
             .iter()
             .filter(|record| record["kind"] != "ACQUISITION_CUT")
             .all(|record| {
-                !record["acquisition_ordinal"].is_null() && !record["acquisition_kind"].is_null()
+                let local_acquisition_loss = record["kind"] == "ADMISSION_DISCREPANCY"
+                    && record["method"] == "adapter/acquisition"
+                    && record["raw"].is_null()
+                    && record["acquisition_ordinal"].is_null()
+                    && record["acquisition_kind"].is_null();
+                local_acquisition_loss
+                    || (!record["acquisition_ordinal"].is_null()
+                        && !record["acquisition_kind"].is_null())
             });
         if !strict_ordered {
             continue;
@@ -1604,7 +1611,14 @@ fn exact_switchyard_owner_terminal_transition_corpus_reopens() {
             .iter()
             .filter(|record| record["kind"] != "ACQUISITION_CUT")
             .all(|record| {
-                !record["acquisition_ordinal"].is_null() && !record["acquisition_kind"].is_null()
+                let local_acquisition_loss = record["kind"] == "ADMISSION_DISCREPANCY"
+                    && record["method"] == "adapter/acquisition"
+                    && record["raw"].is_null()
+                    && record["acquisition_ordinal"].is_null()
+                    && record["acquisition_kind"].is_null();
+                local_acquisition_loss
+                    || (!record["acquisition_ordinal"].is_null()
+                        && !record["acquisition_kind"].is_null())
             });
         if !strict_ordered {
             unordered_compatibility_count += 1;
@@ -1881,8 +1895,8 @@ fn exact_switchyard_owner_terminal_transition_corpus_reopens() {
     }
     assert!(saw_gap && saw_duplicate && saw_reorder);
     assert!(saw_refusal_then_discrepancy);
-    assert_eq!(strict_ordered_count, 65);
-    assert_eq!(unordered_compatibility_count, 61);
+    assert_eq!(strict_ordered_count, 68);
+    assert_eq!(unordered_compatibility_count, 58);
     assert_eq!(unordered_generic_helper_exception_count, 7);
     assert_eq!(strict_generic_helper_exception_count, 1);
     assert!(proved_semantic_replay_not_entered);

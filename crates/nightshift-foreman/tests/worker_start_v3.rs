@@ -50,7 +50,7 @@ fn source_export_verified_tuple_is_exact_and_retained_by_v3() {
     );
     assert_eq!(
         pins.switchyard_owner_head,
-        "2d9fa4eb268eaa9a880af30159e6708db9bc0ba3"
+        "3ba607c950a28c922b26d6dfa66ee06095158dc9"
     );
     assert_eq!(
         pins.switchyard_schema_sha256,

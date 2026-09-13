@@ -52,7 +52,7 @@ const FINAL_SWITCHYARD_OWNER_HEAD: &str = "c01fb1ee586d33a5031d1d928ce40fcabfb4f
 // Corrected source-export candidate: every exported blob is read from this
 // immutable revision and the export manifest verifies the complete closure.
 const SOURCE_EXPORT_VERIFIED_SWITCHYARD_OWNER_HEAD: &str =
-    "2d9fa4eb268eaa9a880af30159e6708db9bc0ba3";
+    "3ba607c950a28c922b26d6dfa66ee06095158dc9";
 const FINAL_SWITCHYARD_SCHEMA_SHA256: &str =
     "sha256:0e9c851cc9fad9538408ab44d84737d5f4d4d7ef39f2fd5db20c6f88fc7fbb9e";
 const FINAL_SWITCHYARD_SCHEMA_BYTES: &[u8] = include_bytes!(
