@@ -1647,7 +1647,7 @@ impl ForemanStore {
             workspace_identity: execution.workspace_identity.clone(),
             provider_model_class: execution.provider_model_class.clone(),
             timeout_seconds: profile.adapter_timeout_seconds,
-            maximum_output_bytes: profile.maximum_event_bytes,
+            maximum_output_bytes: profile.worker_output_bound(),
             recursive_worker_swarms_forbidden: true,
             approval_policy: "SURFACE_ONLY_NO_RESPONSE".to_owned(),
             expected_receipt_schema: WORKER_TERMINAL_RECEIPT_SCHEMA_V1.to_owned(),

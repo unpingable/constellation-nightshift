@@ -54,10 +54,12 @@ use serde_json::{json, Value};
 use sha2::{Digest as _, Sha256};
 use tempfile::TempDir;
 
-#[path = "provider_cases/cli.rs"]
-mod provider_cli_cases;
+#[path = "provider_cases/bounded_turn.rs"]
+mod bounded_turn_cases;
 #[path = "provider_cases/prelaunch.rs"]
 mod prelaunch_cases;
+#[path = "provider_cases/cli.rs"]
+mod provider_cli_cases;
 
 fn bind_predecessor_fixture(
     mut brief: Value,
@@ -241,6 +243,7 @@ fn profile(packet: &NightshiftPacketV1, admission: &ForemanAdmissionV1) -> Execu
         log_custody_root: "/tmp/foreman-fixture/log".into(),
         receipt_custody_root: "/tmp/foreman-fixture/receipts".into(),
         maximum_event_bytes: 65_536,
+        maximum_worker_output_bytes: None,
         maximum_receipt_bytes: 131_072,
         adapter_timeout_seconds: 60,
         closeout_policy: "ALL_EXPLICIT_TERMINAL_OR_NOT_STARTED".into(),
@@ -3868,6 +3871,7 @@ fn holding_fixture_contracts() -> (
         log_custody_root: "/tmp/nightshift-holding/log".to_owned(),
         receipt_custody_root: "/tmp/nightshift-holding/receipts".to_owned(),
         maximum_event_bytes: 1024 * 1024,
+        maximum_worker_output_bytes: None,
         maximum_receipt_bytes: 1024 * 1024,
         adapter_timeout_seconds: 600,
         closeout_policy: "ALL_EXPLICIT_TERMINAL_OR_NOT_STARTED".to_owned(),

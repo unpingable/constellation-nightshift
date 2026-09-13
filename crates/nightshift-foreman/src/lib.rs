@@ -31,6 +31,7 @@ pub const FOREMAN_CAPACITY_ADMISSION_SCHEMA_V1: &str = "nightshift.foreman-capac
 pub const FOREMAN_CAPACITY_REQUIREMENT_SCHEMA_V1: &str =
     "nightshift.foreman-capacity-requirement/v1";
 pub const FOREMAN_EXECUTION_PROFILE_SCHEMA_V2: &str = "nightshift.foreman-execution-profile/v2";
+pub const FOREMAN_EXECUTION_PROFILE_SCHEMA_V3: &str = "nightshift.foreman-execution-profile/v3";
 pub const WORKER_START_REQUEST_SCHEMA_V2: &str = "nightshift.worker-start-request/v2";
 pub const WORKER_BRIEF_BASIS_SCHEMA_V2: &str = "nightshift.worker-brief-basis/v2";
 pub const MAXIMUM_ADAPTER_TIMEOUT_SECONDS: u64 = 86_400;

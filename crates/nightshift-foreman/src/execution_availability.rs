@@ -56,6 +56,13 @@ const SOURCE_EXPORT_VERIFIED_SWITCHYARD_OWNER_HEAD: &str =
 // Packaging successor: runner body is unchanged from the source-export
 // candidate while its install metadata and public-safe smoke checks are closed.
 const PACKAGED_RUNTIME_SWITCHYARD_OWNER_HEAD: &str = "7df43b4e15cb1465f434e072b4233a2e5825c0ca";
+// Independently frozen bounded-custody successor; selection needs new route approval.
+const BOUNDED_TURN_SWITCHYARD_OWNER_HEAD: &str = "8479cb77dc76632e64b66e84c4f75c9765e421a6";
+const BOUNDED_TURN_SWITCHYARD_SCHEMA_SHA256: &str =
+    "sha256:4e4eac904735c570f3fe7332765fffe4608cc3987fee9c1ef4b8db3ffdf03376";
+const BOUNDED_TURN_SWITCHYARD_SCHEMA_BYTES: &[u8] = include_bytes!(
+    "../../../schemas/vendor/switchyard.codex-provider-admission.bounded-turn.v1.schema.json"
+);
 const FINAL_SWITCHYARD_SCHEMA_SHA256: &str =
     "sha256:0e9c851cc9fad9538408ab44d84737d5f4d4d7ef39f2fd5db20c6f88fc7fbb9e";
 const FINAL_SWITCHYARD_SCHEMA_BYTES: &[u8] = include_bytes!(
@@ -70,6 +77,7 @@ const BETA_SWITCHYARD_SCHEMA_SHA256: &str =
 pub const ACCEPTED_SWITCHYARD_DETERMINISTIC_FIXTURE_SHA256: &str =
     "sha256:cafa673ac58f60029fd6c1de229b4f57d9f42ba918b7ecb2a3bfb20cb2b41a31";
 pub const MAXIMUM_AVAILABILITY_EVIDENCE_BYTES: usize = 16 * 1024;
+pub const MAXIMUM_TURN_START_REQUEST_EVIDENCE_BYTES: usize = 256 * 1024;
 pub const MAXIMUM_SWITCHYARD_MAPPER_SNAPSHOT_BYTES: usize = 16 * 1024 * 1024;
 pub const MAXIMUM_DISPATCH_OCCURRENCES: u16 = 16;
 pub const MAXIMUM_TOTAL_DEFERRAL_SECONDS: u64 = 7 * 24 * 60 * 60;
@@ -726,6 +734,15 @@ pub struct ProviderAdmissionOwnerPinsV1 {
 }
 
 impl ProviderAdmissionOwnerPinsV1 {
+    /// Separately selected bounded-request-custody source; never an automatic fallback.
+    pub fn bounded_turn_candidate() -> Self {
+        Self {
+            codex_owner_head: FINAL_CODEX_OWNER_HEAD.to_owned(),
+            switchyard_owner_head: BOUNDED_TURN_SWITCHYARD_OWNER_HEAD.to_owned(),
+            switchyard_schema_sha256: BOUNDED_TURN_SWITCHYARD_SCHEMA_SHA256.to_owned(),
+            ..Self::accepted()
+        }
+    }
     /// Candidate with the runner's declared installation closure.
     pub fn packaged_runtime_candidate() -> Self {
         Self {
@@ -785,6 +802,7 @@ impl ProviderAdmissionOwnerPinsV1 {
     }
     pub fn validate(&self) -> Result<(), ContractError> {
         if self != &Self::accepted()
+            && self != &Self::bounded_turn_candidate()
             && self != &Self::beta_candidate()
             && self != &Self::prior_final_beta_candidate()
             && self != &Self::final_beta_candidate()
@@ -1126,7 +1144,7 @@ impl WorkerStartRequestV3 {
             || self.workspace_identity != execution.workspace_identity
             || self.provider_model_class != execution.provider_model_class
             || self.timeout_seconds != profile.adapter_timeout_seconds
-            || self.maximum_output_bytes != profile.maximum_event_bytes
+            || self.maximum_output_bytes != profile.worker_output_bound()
             || self.provider_id != selection.provider_id
             || self.model_id != selection.model_id
             || self.model_class != selection.model_class
@@ -2015,7 +2033,7 @@ fn validate_switchyard_snapshot(
     raw: &[u8],
 ) -> Result<(), ContractError> {
     let snapshot: Value = serde_json::from_slice(raw).map_err(json_error)?;
-    validate_vendored_switchyard_schema(&snapshot)?;
+    validate_vendored_switchyard_schema(&snapshot, true)?;
     if serde_jcs::to_vec(&snapshot).map_err(json_error)? != raw {
         return Err(ContractError::InvalidField(
             "mapper snapshot canonical bytes",
@@ -2209,7 +2227,7 @@ fn validate_switchyard_snapshot(
             }
         }
         if let Some(raw_evidence) = record.get("raw").filter(|raw_value| !raw_value.is_null()) {
-            validate_switchyard_raw(raw_evidence)?;
+            validate_switchyard_raw(raw_evidence, switchyard_record_raw_bound(record))?;
         }
         let normalized = record
             .get("normalized")
@@ -2320,13 +2338,20 @@ fn validate_switchyard_snapshot(
     Ok(())
 }
 
-fn validate_vendored_switchyard_schema(instance: &Value) -> Result<(), ContractError> {
+fn validate_vendored_switchyard_schema(
+    instance: &Value,
+    bounded_turn: bool,
+) -> Result<(), ContractError> {
     // Closed source/schema pairs. Historical replay does not enroll an older
     // executable for a new provider run; the full graph binds requirement pins.
     let (bytes, expected) = match instance["binding"]["codex_source_head"].as_str() {
         Some(ACCEPTED_CODEX_PROVIDER_ADMISSION_OWNER_HEAD) => (
             SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_BYTES,
             ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_SCHEMA_SHA256,
+        ),
+        Some(FINAL_CODEX_OWNER_HEAD) if bounded_turn => (
+            BOUNDED_TURN_SWITCHYARD_SCHEMA_BYTES,
+            BOUNDED_TURN_SWITCHYARD_SCHEMA_SHA256,
         ),
         Some(FINAL_CODEX_OWNER_HEAD) => (
             FINAL_SWITCHYARD_SCHEMA_BYTES,
@@ -2518,7 +2543,17 @@ fn validate_schema_node(
     Ok(evaluated)
 }
 
-fn validate_switchyard_raw(value: &Value) -> Result<(), ContractError> {
+fn switchyard_record_raw_bound(record: &Value) -> usize {
+    if record["acquisition_kind"].as_str() == Some("CLIENT_REQUEST")
+        && record["method"].as_str() == Some("client-request/turn/start")
+    {
+        MAXIMUM_TURN_START_REQUEST_EVIDENCE_BYTES
+    } else {
+        MAXIMUM_AVAILABILITY_EVIDENCE_BYTES
+    }
+}
+
+fn validate_switchyard_raw(value: &Value, maximum: usize) -> Result<(), ContractError> {
     exact_object_keys(
         value,
         &[
@@ -2549,7 +2584,7 @@ fn validate_switchyard_raw(value: &Value) -> Result<(), ContractError> {
     let bytes =
         hex::decode(bytes_hex).map_err(|_| ContractError::InvalidField("mapper raw hex"))?;
     if bytes.is_empty()
-        || bytes.len() > MAXIMUM_AVAILABILITY_EVIDENCE_BYTES
+        || bytes.len() > maximum
         || bytes.last() != Some(&b'\n')
         || integer(value, "byte_length")? != bytes.len() as i64
         || string(value, "sha256")? != plain_sha256(&bytes)
@@ -2633,8 +2668,8 @@ impl<'de> Visitor<'de> for UniqueJsonVisitor {
     }
 }
 
-fn decode_switchyard_raw(value: &Value) -> Result<Value, ContractError> {
-    validate_switchyard_raw(value)?;
+fn decode_switchyard_raw(value: &Value, maximum: usize) -> Result<Value, ContractError> {
+    validate_switchyard_raw(value, maximum)?;
     let bytes = hex::decode(string(value, "bytes_hex")?)
         .map_err(|_| ContractError::InvalidField("mapper raw hex"))?;
     let mut deserializer = serde_json::Deserializer::from_slice(&bytes);
@@ -3506,7 +3541,7 @@ fn validate_switchyard_raw_replay(
             return Err(ContractError::InvalidField("loss evidence kind"));
         }
         if !raw.is_null() {
-            validate_switchyard_raw(raw)?;
+            validate_switchyard_raw(raw, MAXIMUM_AVAILABILITY_EVIDENCE_BYTES)?;
             if string(raw, "representation")?
                 != "EXACT_ACQUIRED_FRAME_BYTES_INCLUDING_LINE_TERMINATOR"
             {
@@ -3574,7 +3609,7 @@ fn validate_switchyard_raw_replay(
         }
         return Err(ContractError::InvalidField("raw replay evidence absence"));
     }
-    let wire = decode_switchyard_raw(raw)?;
+    let wire = decode_switchyard_raw(raw, switchyard_record_raw_bound(record))?;
     let wire_object = wire
         .as_object()
         .ok_or(ContractError::InvalidField("raw replay object"))?;
@@ -4571,6 +4606,11 @@ pub fn validate_execution_availability_graph(
     if disposition.mapper_snapshot_schema == "switchyard.codex-provider-admission-snapshot/v1" {
         let snapshot: Value =
             serde_json::from_slice(&disposition.mapper_snapshot.validate()?).map_err(json_error)?;
+        // Historical owner/schema tuples retain their original frame limits.
+        validate_vendored_switchyard_schema(
+            &snapshot,
+            requirement.owner_pins == ProviderAdmissionOwnerPinsV1::bounded_turn_candidate(),
+        )?;
         if snapshot["binding"]["codex_source_head"].as_str()
             != Some(requirement.owner_pins.codex_owner_head.as_str())
         {

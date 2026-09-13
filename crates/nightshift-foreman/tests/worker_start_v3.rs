@@ -19,6 +19,7 @@ type V3Substitution = Box<dyn Fn(&mut WorkerStartRequestV3)>;
 
 #[test]
 fn explicit_beta_owner_tuple_preserves_requirement_binding_without_fallback() {
+    check_candidate_tuple(ProviderAdmissionOwnerPinsV1::bounded_turn_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::beta_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::prior_final_beta_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::final_beta_candidate());
@@ -193,6 +194,74 @@ fn check_candidate_tuple(pins: ProviderAdmissionOwnerPinsV1) {
         .is_err());
 }
 
+#[test]
+fn profile_v3_separates_output_and_retains_v2_exact_bytes() {
+    let old = profile();
+    let raw = canonical(&old);
+    assert!(!serde_json::from_slice::<Value>(&raw)
+        .unwrap()
+        .as_object()
+        .unwrap()
+        .contains_key("maximum_worker_output_bytes"));
+    assert_eq!(
+        canonical(&ExecutionProfileV2::from_slice(&raw).unwrap()),
+        raw
+    );
+    assert_eq!(old.worker_output_bound(), old.maximum_event_bytes);
+    let mut current = old.clone();
+    current.schema = nightshift_foreman::FOREMAN_EXECUTION_PROFILE_SCHEMA_V3.to_owned();
+    current.maximum_event_bytes = 16 * 1024 * 1024;
+    current.maximum_worker_output_bytes = Some(32768);
+    current.adapter_timeout_seconds = 120;
+    current.seal().unwrap();
+    assert_eq!(current.worker_output_bound(), 32768);
+    assert_ne!(current.profile_digest, old.profile_digest);
+    let mut start = v2();
+    start.maximum_output_bytes = 32768;
+    start.timeout_seconds = 120;
+    start.seal().unwrap();
+    let mut requirement = requirement(&current);
+    requirement.owner_pins = ProviderAdmissionOwnerPinsV1::bounded_turn_candidate();
+    requirement.seal().unwrap();
+    let request = WorkerStartRequestV3::from_v2_for_dispatch(
+        &canonical(&start),
+        &current,
+        &requirement,
+        "dispatch-output-split",
+        0,
+    )
+    .unwrap();
+    assert_eq!(request.maximum_output_bytes, 32768);
+    assert_eq!(request.internal_provider_retry_count, 0);
+    request
+        .validate_dispatch_graph(&current, &requirement, &dispatch(&request, &requirement))
+        .unwrap();
+    for version in [
+        nightshift_foreman::FOREMAN_EXECUTION_PROFILE_SCHEMA_V2,
+        nightshift_foreman::FOREMAN_EXECUTION_PROFILE_SCHEMA_V3,
+    ] {
+        let mut value = serde_json::to_value(&old).unwrap();
+        value["schema"] = json!(version);
+        value["maximum_worker_output_bytes"] = Value::Null;
+        assert!(ExecutionProfileV2::from_slice(&canonical(&value)).is_err());
+        assert!(serde_json::from_value::<ExecutionProfileV2>(value).is_err());
+    }
+    for bound in [0, 1023, 16 * 1024 * 1024 + 1] {
+        let mut invalid = current.clone();
+        invalid.maximum_worker_output_bytes = Some(bound);
+        assert!(invalid.seal().is_err());
+    }
+    let mut old_with_new_field = current.clone();
+    old_with_new_field.schema = nightshift_foreman::FOREMAN_EXECUTION_PROFILE_SCHEMA_V2.to_owned();
+    assert!(old_with_new_field.seal().is_err());
+    let mut missing = current.clone();
+    missing.maximum_worker_output_bytes = None;
+    assert!(missing.seal().is_err());
+    let mut unknown = serde_json::to_value(&current).unwrap();
+    unknown["unknown_capture_cap"] = json!(262144);
+    assert!(ExecutionProfileV2::from_slice(&canonical(&unknown)).is_err());
+}
+
 fn digest(fill: char) -> String {
     format!("sha256:{}", fill.to_string().repeat(64))
 }
@@ -258,6 +327,7 @@ fn profile() -> ExecutionProfileV2 {
         log_custody_root: "/tmp/nightshift-holding/log".to_owned(),
         receipt_custody_root: "/tmp/nightshift-holding/receipt".to_owned(),
         maximum_event_bytes: 1024 * 1024,
+        maximum_worker_output_bytes: None,
         maximum_receipt_bytes: 1024 * 1024,
         adapter_timeout_seconds: 600,
         closeout_policy: "ALL_EXPLICIT_TERMINAL_OR_NOT_STARTED".to_owned(),

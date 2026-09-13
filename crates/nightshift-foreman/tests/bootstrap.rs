@@ -212,6 +212,7 @@ fn profile(
         log_custody_root: "/tmp/second-watch-fixture/log".to_owned(),
         receipt_custody_root: "/tmp/second-watch-fixture/receipts".to_owned(),
         maximum_event_bytes: 1024 * 1024,
+        maximum_worker_output_bytes: None,
         maximum_receipt_bytes: 131_072,
         adapter_timeout_seconds: 60,
         closeout_policy: "ALL_EXPLICIT_TERMINAL_OR_NOT_STARTED".to_owned(),

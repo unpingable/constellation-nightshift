@@ -10,17 +10,18 @@ use thiserror::Error;
 use crate::{
     FOREMAN_ADMISSION_SCHEMA_V1, FOREMAN_CAPACITY_ADMISSION_SCHEMA_V1,
     FOREMAN_CAPACITY_REQUIREMENT_SCHEMA_V1, FOREMAN_EXECUTION_PROFILE_SCHEMA_V2,
-    MAXIMUM_ADAPTER_TIMEOUT_SECONDS, MAXIMUM_PREDECESSOR_RECEIPTS, MAXIMUM_WORKER_BRIEF_BYTES,
-    MAXIMUM_WORKER_OUTPUT_BYTES, WORKER_ADAPTER_CAPABILITIES_SCHEMA_V1,
-    WORKER_ADAPTER_EVENT_SCHEMA_V1, WORKER_ATTEMPT_BINDING_SCHEMA_V1, WORKER_BRIEF_BASIS_SCHEMA_V2,
-    WORKER_START_REQUEST_SCHEMA_V2, WORKER_TERMINAL_RECEIPT_SCHEMA_V1,
-    WORK_ITEM_NOT_STARTED_RECEIPT_SCHEMA_V1,
+    FOREMAN_EXECUTION_PROFILE_SCHEMA_V3, MAXIMUM_ADAPTER_TIMEOUT_SECONDS,
+    MAXIMUM_PREDECESSOR_RECEIPTS, MAXIMUM_WORKER_BRIEF_BYTES, MAXIMUM_WORKER_OUTPUT_BYTES,
+    WORKER_ADAPTER_CAPABILITIES_SCHEMA_V1, WORKER_ADAPTER_EVENT_SCHEMA_V1,
+    WORKER_ATTEMPT_BINDING_SCHEMA_V1, WORKER_BRIEF_BASIS_SCHEMA_V2, WORKER_START_REQUEST_SCHEMA_V2,
+    WORKER_TERMINAL_RECEIPT_SCHEMA_V1, WORK_ITEM_NOT_STARTED_RECEIPT_SCHEMA_V1,
 };
 
 const ADMISSION_DOMAIN: &[u8] = b"nightshift.foreman-admission.digest/v1\0";
 const CAPACITY_ADMISSION_DOMAIN: &[u8] = b"nightshift.foreman-capacity-admission.digest/v1\0";
 const CAPACITY_REQUIREMENT_DOMAIN: &[u8] = b"nightshift.foreman-capacity-requirement.digest/v1\0";
 const PROFILE_DOMAIN_V2: &[u8] = b"nightshift.foreman-execution-profile.digest/v2\0";
+const PROFILE_DOMAIN_V3: &[u8] = b"nightshift.foreman-execution-profile.digest/v3\0";
 const START_DOMAIN_V2: &[u8] = b"nightshift.worker-start-request.digest/v2\0";
 const EVENT_DOMAIN: &[u8] = b"nightshift.worker-adapter-event.digest/v1\0";
 const TERMINAL_DOMAIN: &[u8] = b"nightshift.worker-terminal-receipt.digest/v1\0";
@@ -301,6 +302,13 @@ pub struct ExecutionProfileV2 {
     pub log_custody_root: String,
     pub receipt_custody_root: String,
     pub maximum_event_bytes: u64,
+    /// V3 separates model output from journal custody. V2 must omit this field.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_output_bound"
+    )]
+    pub maximum_worker_output_bytes: Option<u64>,
     pub maximum_receipt_bytes: u64,
     pub adapter_timeout_seconds: u64,
     pub closeout_policy: String,
@@ -325,18 +333,46 @@ pub struct WorkItemExecutionV1 {
     pub provider_model_class: String,
 }
 
+fn present_output_bound<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<u64>, D::Error> {
+    // The field may be absent for V2, but explicit null is never its spelling.
+    u64::deserialize(deserializer).map(Some)
+}
+
 impl ExecutionProfileV2 {
     pub fn from_slice(bytes: &[u8]) -> Result<Self, ContractError> {
-        parse(bytes)
+        let value: Value = parse(bytes)?;
+        if value.get("schema").and_then(Value::as_str) == Some(FOREMAN_EXECUTION_PROFILE_SCHEMA_V2)
+            && value.get("maximum_worker_output_bytes").is_some()
+        {
+            return Err(ContractError::InvalidField("V2 profile output field"));
+        }
+        serde_json::from_value(value).map_err(|error| ContractError::Json(error.to_string()))
     }
     pub fn seal(&mut self) -> Result<(), ContractError> {
-        self.profile_digest = digest_without(self, "profile_digest", PROFILE_DOMAIN_V2)?;
+        self.profile_digest = digest_without(self, "profile_digest", self.profile_domain()?)?;
         self.validate()
     }
+    fn profile_domain(&self) -> Result<&'static [u8], ContractError> {
+        match (self.schema.as_str(), self.maximum_worker_output_bytes) {
+            (FOREMAN_EXECUTION_PROFILE_SCHEMA_V2, None) => Ok(PROFILE_DOMAIN_V2),
+            (FOREMAN_EXECUTION_PROFILE_SCHEMA_V3, Some(bound))
+                if (1024..=MAXIMUM_WORKER_OUTPUT_BYTES).contains(&bound) =>
+            {
+                Ok(PROFILE_DOMAIN_V3)
+            }
+            _ => Err(ContractError::InvalidField("profile schema/output bounds")),
+        }
+    }
+    pub fn worker_output_bound(&self) -> u64 {
+        self.maximum_worker_output_bytes
+            .unwrap_or(self.maximum_event_bytes)
+    }
     pub fn validate(&self) -> Result<(), ContractError> {
-        schema(&self.schema, FOREMAN_EXECUTION_PROFILE_SCHEMA_V2)?;
+        let domain = self.profile_domain()?;
         digest("profile_digest", &self.profile_digest)?;
-        if digest_without(self, "profile_digest", PROFILE_DOMAIN_V2)? != self.profile_digest {
+        if digest_without(self, "profile_digest", domain)? != self.profile_digest {
             return Err(ContractError::DigestMismatch("profile_digest"));
         }
         digest("packet_digest", &self.packet_digest)?;
@@ -482,7 +518,7 @@ pub fn verify_adapter_contract(
         || start.workspace_identity != execution.workspace_identity
         || start.provider_model_class != execution.provider_model_class
         || start.timeout_seconds != profile.adapter_timeout_seconds
-        || start.maximum_output_bytes != profile.maximum_event_bytes
+        || start.maximum_output_bytes != profile.worker_output_bound()
     {
         return Err(ContractError::InvalidField(
             "profile capability start binding",
