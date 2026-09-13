@@ -125,7 +125,9 @@ fn preflight_failure_requires_the_same_terminal_preclaim_testimony() {
         .accept_prelaunch_closure(&holding_canonical(&reseal(closure.clone())))
         .unwrap();
     assert_eq!(
-        NotStartedReceiptV1::from_slice(&receipt).unwrap().result_classification,
+        NotStartedReceiptV1::from_slice(&receipt)
+            .unwrap()
+            .result_classification,
         "LOCAL_PRELAUNCH_FAILURE"
     );
 
