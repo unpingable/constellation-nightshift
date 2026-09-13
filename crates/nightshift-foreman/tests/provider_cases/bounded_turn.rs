@@ -40,6 +40,19 @@ fn expanded_vector() -> Value {
         "evidence_digest",
         b"switchyard.codex-provider-admission-evidence.digest/v1\0",
     );
+    // The retained response also binds the exact request params. Expanding
+    // request bytes must update that dependency, not only the request record.
+    let params_digest = record["normalized"]["params_sha256"].clone();
+    let response = &mut snapshot["records"][1];
+    assert_eq!(response["kind"], "CLIENT_RESPONSE_RETAINED");
+    assert_eq!(response["normalized"]["request_id"], 3);
+    assert_eq!(response["normalized"]["request_method"], "turn/start");
+    response["normalized"]["params_sha256"] = params_digest;
+    *response = holding_seal_value(
+        response.clone(),
+        "evidence_digest",
+        b"switchyard.codex-provider-admission-evidence.digest/v1\0",
+    );
     snapshot = holding_seal_value(
         snapshot,
         "snapshot_digest",
