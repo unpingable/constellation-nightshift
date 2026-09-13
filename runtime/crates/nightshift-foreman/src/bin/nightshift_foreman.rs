@@ -581,7 +581,14 @@ fn main() -> Result<()> {
             print_json(&ForemanStore::open_read_only(db)?.projection(&run_id)?)?;
         }
         Command::Events { db, run_id } => {
-            print_json(&ForemanStore::open_read_only(db)?.export_events(&run_id)?)?;
+            // Retained evidence includes byte arrays. Pretty-printing each byte
+            // can triple a valid journal's size and exceed a bounded reader's
+            // allowance. Preserve every JSON value using compact framing;
+            // this changes neither journal bytes nor their recorded digests.
+            let events = ForemanStore::open_read_only(db)?.export_events(&run_id)?;
+            let mut bytes = serde_json::to_vec(&events)?;
+            bytes.push(b'\n');
+            write_raw(&bytes)?;
         }
         Command::Close {
             db,

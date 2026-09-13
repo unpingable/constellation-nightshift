@@ -73,6 +73,18 @@ fn bounded_turn_cross_language_vector_is_exact() {
 
 #[test]
 fn bounded_turn_native_intake_replays_full_custody_and_keeps_output_32k() {
+    native_intake(
+        expanded_vector(),
+        ProviderAdmissionOwnerPinsV1::bounded_turn_candidate(),
+        &[],
+    );
+}
+
+pub(super) fn native_intake(
+    snapshot: Value,
+    owner_pins: ProviderAdmissionOwnerPinsV1,
+    negative_snapshots: &[Value],
+) {
     let (directory, path, packet, admission, mut profile, policy, _) = holding_fixture_contracts();
     profile.schema = nightshift_foreman::FOREMAN_EXECUTION_PROFILE_SCHEMA_V3.to_owned();
     profile.maximum_worker_output_bytes = Some(32768);
@@ -80,7 +92,7 @@ fn bounded_turn_native_intake_replays_full_custody_and_keeps_output_32k() {
     profile.adapter_timeout_seconds = 120;
     profile.seal().unwrap();
     let mut requirement = holding_requirement(&packet, &admission, &profile, &policy);
-    requirement.owner_pins = ProviderAdmissionOwnerPinsV1::bounded_turn_candidate();
+    requirement.owner_pins = owner_pins;
     for selections in requirement.work_item_model_selections.values_mut() {
         selections.truncate(1);
         selections[0].model_id = "gpt-5.6-terra".to_owned();
@@ -152,28 +164,58 @@ fn bounded_turn_native_intake_replays_full_custody_and_keeps_output_32k() {
     assert_eq!(opened.worker_start_request.timeout_seconds, 120);
     assert_eq!(opened.worker_start_request.internal_provider_retry_count, 0);
     fs::write(p("dispatch.json"), holding_canonical(&opened.dispatch)).unwrap();
-    let raw = holding_retarget_snapshot(expanded_vector(), &opened);
+    let raw = holding_retarget_snapshot(snapshot, &opened);
     fs::write(p("snapshot.json"), &raw).unwrap();
-    let derived = invoke(&[
+    let requirement_path = p("requirement.json");
+    let dispatch_path = p("dispatch.json");
+    let policy_path = p("policy.json");
+    let snapshot_path = p("snapshot.json");
+    let derive_args = [
         "provider-derive-evidence",
         "--requirement",
-        p("requirement.json").to_str().unwrap(),
+        requirement_path.to_str().unwrap(),
         "--dispatch",
-        p("dispatch.json").to_str().unwrap(),
+        dispatch_path.to_str().unwrap(),
         "--policy",
-        p("policy.json").to_str().unwrap(),
+        policy_path.to_str().unwrap(),
         "--snapshot",
-        p("snapshot.json").to_str().unwrap(),
+        snapshot_path.to_str().unwrap(),
         "--received-at",
         "2026-08-31T12:01:02Z",
         "--expires-at",
         "2026-08-31T12:01:32Z",
-    ]);
+    ];
+    // Every substitution is publication-safe synthetic data. Failure must precede
+    // journal intake; these commands never start a worker or contact a provider.
+    for (index, changed) in negative_snapshots.iter().enumerate() {
+        fs::write(
+            p("snapshot.json"),
+            holding_retarget_snapshot(changed.clone(), &opened),
+        )
+        .unwrap();
+        let refused = invoke(&derive_args);
+        assert!(
+            !refused.status.success(),
+            "negative echo case {index} unexpectedly derived"
+        );
+    }
+    fs::write(p("snapshot.json"), &raw).unwrap();
+    let derived = invoke(&derive_args);
     assert!(
         derived.status.success(),
         "{}",
         String::from_utf8_lossy(&derived.stderr)
     );
+    if requirement.owner_pins == ProviderAdmissionOwnerPinsV1::bounded_turn_echo_candidate() {
+        if let Ok(legacy) = std::env::var("BOUNDED_TURN_ECHO_LEGACY_FOREMAN") {
+            assert!(!Command::new(legacy)
+                .args(derive_args)
+                .output()
+                .unwrap()
+                .status
+                .success());
+        }
+    }
     let derived: Value = serde_json::from_slice(&derived.stdout).unwrap();
     assert_eq!(derived["graph_validation"], "VALIDATED", "{derived}");
     assert_eq!(
@@ -219,6 +261,9 @@ fn bounded_turn_native_intake_replays_full_custody_and_keeps_output_32k() {
     ]);
     assert!(readback.status.success());
     let events: Value = serde_json::from_slice(&readback.stdout).unwrap();
+    let mut compact_events = serde_json::to_vec(&events).unwrap();
+    compact_events.push(b'\n');
+    assert_eq!(readback.stdout, compact_events);
     let retained: Vec<_> = events
         .as_array()
         .unwrap()
@@ -231,10 +276,10 @@ fn bounded_turn_native_intake_replays_full_custody_and_keeps_output_32k() {
         derived["disposition"]
     );
     let event_bytes = holding_canonical(retained[0]).len();
-    assert!(event_bytes > 32768 && event_bytes < 16 * 1024 * 1024);
-    assert!(readback.stdout.len() < 16 * 1024 * 1024);
     println!("SYNTHETIC_NO_PROVIDER_CONTACT wire=118500 snapshot={} disposition={} journal_event={} aggregate_query={} output_bound=32768",
         raw.len(), holding_canonical(&derived["disposition"]).len(), event_bytes, readback.stdout.len());
+    assert!(event_bytes > 32768 && event_bytes < 16 * 1024 * 1024);
+    assert!(readback.stdout.len() < 16 * 1024 * 1024);
     // Ordinary provider-record preserves its prior refusal-on-duplicate contract.
     // Response-loss recovery reads the original record, never creates a new dispatch.
     assert!(!invoke(&record_args).status.success());
@@ -252,7 +297,12 @@ fn bounded_turn_native_intake_replays_full_custody_and_keeps_output_32k() {
     let store = ForemanStore::open_read_only(&path).unwrap();
     store.read_only_run_snapshot(&admission.run_id).unwrap();
     let mut old = requirement.clone();
-    old.owner_pins = ProviderAdmissionOwnerPinsV1::packaged_runtime_candidate();
+    old.owner_pins =
+        if requirement.owner_pins == ProviderAdmissionOwnerPinsV1::bounded_turn_echo_candidate() {
+            ProviderAdmissionOwnerPinsV1::bounded_turn_candidate()
+        } else {
+            ProviderAdmissionOwnerPinsV1::packaged_runtime_candidate()
+        };
     old.seal().unwrap();
     let mut old_dispatch = opened.dispatch.clone();
     old_dispatch.requirement_digest = old.requirement_digest.clone();
