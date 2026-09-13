@@ -6,12 +6,14 @@
 pub mod bootstrap;
 pub mod contract;
 pub mod execution_availability;
+pub mod prelaunch;
 pub mod scheduler;
 pub mod store;
 
 pub use bootstrap::*;
 pub use contract::*;
 pub use execution_availability::*;
+pub use prelaunch::*;
 pub use scheduler::{LiveRunProjectionV1, LiveWorkItemV1, Scheduler};
 pub use store::{
     read_only_run_snapshot, reopen_capacity_journal_event,

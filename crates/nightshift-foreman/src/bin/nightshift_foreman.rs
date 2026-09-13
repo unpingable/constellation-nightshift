@@ -231,6 +231,14 @@ enum Command {
         #[arg(long)]
         receipt: PathBuf,
     },
+    /// Accept exact Switchyard pre-launch closure custody from the trusted local
+    /// owner transport. No provider execution or retry authority is inferred.
+    AcceptPrelaunchClosure {
+        #[arg(long)]
+        db: PathBuf,
+        #[arg(long)]
+        receipt: PathBuf,
+    },
     Status {
         #[arg(long)]
         db: PathBuf,
@@ -560,6 +568,12 @@ fn main() -> Result<()> {
         }
         Command::AcceptNotStarted { db, receipt } => {
             ForemanStore::open(db)?.accept_not_started(&read(&receipt)?)?;
+        }
+        Command::AcceptPrelaunchClosure { db, receipt } => {
+            write_raw(
+                &ForemanStore::open(db)?
+                    .accept_prelaunch_closure(&read_bounded_existing(&receipt)?)?,
+            )?;
         }
         Command::Status { db, run_id }
         | Command::Replay { db, run_id }

@@ -56,6 +56,8 @@ use tempfile::TempDir;
 
 #[path = "provider_cases/cli.rs"]
 mod provider_cli_cases;
+#[path = "provider_cases/prelaunch.rs"]
+mod prelaunch_cases;
 
 fn bind_predecessor_fixture(
     mut brief: Value,

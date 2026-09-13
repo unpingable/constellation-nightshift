@@ -28,7 +28,7 @@ use crate::{
     DeferredProviderDispatchV1, ExecutionAvailabilityObservationV1, ExecutionAvailabilityPolicyV1,
     ExecutionProfileV2, ForemanAdmissionV1, ForemanCapacityAdmissionV1,
     ForemanCapacityRequirementV1, ForemanExecutionAvailabilityRequirementV1, HumanQuestionV1,
-    LiveRunProjectionV1, NotStartedReceiptV1, ParkedResourceLockPolicyV1,
+    LiveRunProjectionV1, NotStartedReceiptV1, ParkedResourceLockPolicyV1, PrelaunchClosureV1,
     ProviderAdmissionDispositionV1, ProviderDeferralHistoryEntryV1, ProviderDispatchOccurrenceV1,
     ProviderExecutionIdentityV1, ProviderMechanismStateV1, ReceiptRepositoryV1, Scheduler,
     SchedulerStateV1, SelfHostedDriverDispositionV1, SelfHostedForemanBootstrapV1,
@@ -372,6 +372,10 @@ enum InternalPayload {
     },
     NotStartedAccepted {
         outcome: AcceptedOutcomeV1,
+    },
+    PrelaunchClosureAccepted {
+        closure: Box<PrelaunchClosureV1>,
+        receipt: Box<NotStartedReceiptV1>,
     },
     ResourcesReleased,
     RunClosed {
@@ -2588,6 +2592,130 @@ impl ForemanStore {
         Ok(())
     }
 
+    /// Accept mechanism-owned local closure testimony for an exact prepared
+    /// attempt. The trusted local caller obtains these bytes from Switchyard's
+    /// retained tombstone; a digest alone is not issuer authentication.
+    pub fn accept_prelaunch_closure(&self, raw: &[u8]) -> Result<Vec<u8>, ForemanError> {
+        let closure = PrelaunchClosureV1::from_slice(raw)?;
+        let binding = &closure.binding;
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let (packet, admission, profile, _) = load_contracts(&transaction, &binding.run_id)?;
+        let receipt = prelaunch_not_started_receipt(&closure)?;
+        let receipt_bytes =
+            serde_jcs::to_vec(&receipt).map_err(|e| ForemanError::Serialization(e.to_string()))?;
+        if receipt_bytes.len() as u64 > profile.maximum_receipt_bytes {
+            return Err(ForemanError::InputTooLarge("prelaunch receipt"));
+        }
+        let prior: Option<Vec<u8>> = transaction
+            .query_row(
+                "SELECT raw_bytes FROM terminal_receipts WHERE run_id=?1 AND work_item_id=?2",
+                params![binding.run_id, binding.work_item_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if let Some(prior) = prior {
+            if prior != receipt_bytes {
+                return Err(ForemanError::Transition(
+                    "conflicting prelaunch closure".to_owned(),
+                ));
+            }
+            load_projection(&transaction, &binding.run_id)?;
+            return Ok(prior);
+        }
+        let projection = load_projection(&transaction, &binding.run_id)?;
+        let item = projection
+            .work_items
+            .iter()
+            .find(|item| item.work_item_id == binding.work_item_id)
+            .ok_or_else(|| ForemanError::UnknownWorkItem(binding.work_item_id.clone()))?;
+        if item.scheduler_state != SchedulerStateV1::Dispatching
+            || item.active_attempt_id.as_deref() != Some(binding.work_attempt_id.as_str())
+        {
+            return Err(ForemanError::Transition(
+                "prelaunch closure requires exact DISPATCHING attempt".to_owned(),
+            ));
+        }
+        exact_active_attempt(
+            &transaction,
+            &binding.run_id,
+            &binding.work_item_id,
+            &binding.work_attempt_id,
+        )?;
+        let history = load_execution_availability_history(
+            &transaction,
+            &binding.run_id,
+            &packet,
+            &admission,
+            &profile,
+        )?
+        .ok_or_else(|| {
+            ForemanError::Transition(
+                "prelaunch closure requires provider dispatch custody".to_owned(),
+            )
+        })?;
+        let index = history
+            .dispatches
+            .iter()
+            .rposition(|dispatch| dispatch.work_attempt_id == binding.work_attempt_id)
+            .ok_or(ForemanError::IdentityMismatch("prelaunch dispatch"))?;
+        if history
+            .dispositions
+            .iter()
+            .any(|value| value.work_attempt_id == binding.work_attempt_id)
+        {
+            return Err(ForemanError::Transition(
+                "prelaunch closure refuses observed provider disposition".to_owned(),
+            ));
+        }
+        let brief = worker_brief_bytes(
+            &transaction,
+            &packet,
+            &profile,
+            &binding.run_id,
+            &binding.work_item_id,
+        )?;
+        closure.validate_prepared(
+            &history.worker_start_requests[index],
+            &history.dispatches[index],
+            &brief,
+        )?;
+        transaction.execute(
+            "INSERT INTO terminal_receipts (run_id,work_item_id,attempt_id,receipt_digest,raw_bytes,receipt_kind)
+             VALUES (?1,?2,NULL,?3,?4,'not_started')",
+            params![binding.run_id, binding.work_item_id, receipt.receipt_digest, receipt_bytes])?;
+        let event = InternalEvent {
+            schema: INTERNAL_EVENT_SCHEMA.to_owned(),
+            event_id: format!("prelaunch-closed-{}", closure.closure_digest),
+            run_id: binding.run_id.clone(),
+            work_item_id: Some(binding.work_item_id.clone()),
+            attempt_id: Some(binding.work_attempt_id.clone()),
+            recorded_at: closure.closed_at,
+            payload: InternalPayload::PrelaunchClosureAccepted {
+                closure: Box::new(closure.clone()),
+                receipt: Box::new(receipt),
+            },
+        };
+        if serde_jcs::to_vec(&event)
+            .map_err(|e| ForemanError::Serialization(e.to_string()))?
+            .len() as u64
+            > profile.maximum_event_bytes
+        {
+            return Err(ForemanError::InputTooLarge("prelaunch journal event"));
+        }
+        append_internal(&transaction, &event)?;
+        release_resources(
+            &transaction,
+            &binding.run_id,
+            &binding.work_item_id,
+            &binding.work_attempt_id,
+            closure.closed_at,
+        )?;
+        load_projection(&transaction, &binding.run_id)?;
+        transaction.commit()?;
+        Ok(receipt_bytes)
+    }
+
     pub fn accept_not_started(&self, raw: &[u8]) -> Result<(), ForemanError> {
         let receipt = NotStartedReceiptV1::from_slice(raw)?;
         receipt.validate()?;
@@ -3301,6 +3429,7 @@ fn validate_read_only_event_row(
                 | ("internal", InternalPayload::TerminalAccepted { .. })
                 | ("internal", InternalPayload::TerminalRefused { .. })
                 | ("internal", InternalPayload::NotStartedAccepted { .. })
+                | ("internal", InternalPayload::PrelaunchClosureAccepted { .. })
                 | ("internal", InternalPayload::ResourcesReleased)
                 | ("internal", InternalPayload::RunClosed { .. })
                 | (
@@ -5183,6 +5312,7 @@ fn validate_execution_availability_history_size(
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum AvailabilityLaneEvent {
     Dispatch(String),
+    PrelaunchClosed,
     Disposition(String),
     Reacquired {
         wake_occurrence_id: String,
@@ -5475,6 +5605,72 @@ fn validate_execution_availability_history_rows(
                 );
                 history.worker_start_requests.push(*start_request);
                 history.dispatches.push(*dispatch);
+            }
+            InternalPayload::PrelaunchClosureAccepted { closure, receipt } => {
+                let history = history.as_ref().ok_or_else(|| {
+                    ForemanError::ReadOnlyStore(
+                        "prelaunch closure lacks provider history".to_owned(),
+                    )
+                })?;
+                let binding = &closure.binding;
+                let key = (
+                    binding.work_item_id.clone(),
+                    binding.work_attempt_id.clone(),
+                );
+                if lane_last.get(&key)
+                    != Some(&AvailabilityLaneEvent::Dispatch(
+                        binding.dispatch_digest.clone(),
+                    ))
+                    || history
+                        .dispositions
+                        .iter()
+                        .any(|value| value.work_attempt_id == binding.work_attempt_id)
+                    || event.work_item_id.as_deref() != Some(binding.work_item_id.as_str())
+                    || event.attempt_id.as_deref() != Some(binding.work_attempt_id.as_str())
+                    || event.recorded_at != closure.closed_at
+                    || event.event_id != format!("prelaunch-closed-{}", closure.closure_digest)
+                {
+                    return Err(ForemanError::ReadOnlyStore(
+                        "prelaunch closure history mismatch".to_owned(),
+                    ));
+                }
+                let index = history
+                    .dispatches
+                    .iter()
+                    .position(|dispatch| dispatch.dispatch_digest == binding.dispatch_digest)
+                    .ok_or(ForemanError::IdentityMismatch("prelaunch dispatch"))?;
+                let brief = worker_brief_bytes(
+                    connection,
+                    packet,
+                    profile,
+                    &binding.run_id,
+                    &binding.work_item_id,
+                )?;
+                closure.validate_prepared(
+                    &history.worker_start_requests[index],
+                    &history.dispatches[index],
+                    &brief,
+                )?;
+                let expected_receipt = prelaunch_not_started_receipt(&closure)?;
+                if *receipt != expected_receipt {
+                    return Err(ForemanError::ReadOnlyStore(
+                        "prelaunch receipt custody differs".to_owned(),
+                    ));
+                }
+                let (raw, kind, attempt): (Vec<u8>, String, Option<String>) = connection.query_row(
+                    "SELECT raw_bytes,receipt_kind,attempt_id FROM terminal_receipts WHERE run_id=?1 AND work_item_id=?2",
+                    params![binding.run_id, binding.work_item_id], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)))?;
+                if raw
+                    != serde_jcs::to_vec(&expected_receipt)
+                        .map_err(|e| ForemanError::Serialization(e.to_string()))?
+                    || kind != "not_started"
+                    || attempt.is_some()
+                {
+                    return Err(ForemanError::ReadOnlyStore(
+                        "prelaunch receipt row differs".to_owned(),
+                    ));
+                }
+                lane_last.insert(key, AvailabilityLaneEvent::PrelaunchClosed);
             }
             InternalPayload::ProviderDispositionRecorded {
                 observation,
@@ -6106,6 +6302,13 @@ fn load_projection(
                 InternalPayload::NotStartedAccepted { outcome } => {
                     ReplayKind::NotStartedAccepted(outcome)
                 }
+                InternalPayload::PrelaunchClosureAccepted { receipt, .. } => {
+                    ReplayKind::NotStartedAccepted(AcceptedOutcomeV1 {
+                        state: receipt.state,
+                        result_classification: receipt.result_classification,
+                        receipt_digest: receipt.receipt_digest,
+                    })
+                }
                 InternalPayload::ResourcesReleased => ReplayKind::ResourcesReleased,
                 InternalPayload::RunClosed {
                     final_receipts_digest,
@@ -6175,6 +6378,30 @@ fn exact_active_attempt(
         return Err(ForemanError::IdentityMismatch("attempt_id"));
     }
     Ok(())
+}
+
+fn prelaunch_not_started_receipt(
+    closure: &PrelaunchClosureV1,
+) -> Result<NotStartedReceiptV1, ForemanError> {
+    closure.validate()?;
+    let mut receipt = NotStartedReceiptV1 {
+        schema: crate::WORK_ITEM_NOT_STARTED_RECEIPT_SCHEMA_V1.to_owned(),
+        receipt_digest: placeholder_digest(), packet_digest: closure.binding.packet_digest.clone(),
+        run_id: closure.binding.run_id.clone(), work_item_id: closure.binding.work_item_id.clone(),
+        recorded_at: closure.closed_at, state: "NOT_STARTED".to_owned(),
+        result_classification: "LOCAL_PRELAUNCH_FAILURE".to_owned(),
+        evidence: vec![closure.closure_digest.clone()],
+        remaining_trigger: "Prepared attempt retained; backend launch failed before provider claim. No worker result exists.".to_owned(),
+        next_lawful_action: "Review the local failure and obtain separately admitted successor work; this closure grants no retry.".to_owned(),
+        human_questions: Vec::new(),
+        extensions: BTreeMap::from([
+            ("prelaunch_closure".to_owned(), serde_json::to_value(closure)
+                .map_err(|e| ForemanError::Serialization(e.to_string()))?),
+            ("prepared_attempt_id".to_owned(), Value::String(closure.binding.work_attempt_id.clone())),
+        ]),
+    };
+    receipt.seal()?;
+    Ok(receipt)
 }
 
 #[derive(Clone)]
