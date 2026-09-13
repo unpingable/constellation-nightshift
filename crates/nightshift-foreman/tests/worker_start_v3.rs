@@ -22,10 +22,15 @@ fn explicit_beta_owner_tuple_preserves_requirement_binding_without_fallback() {
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::beta_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::prior_final_beta_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::final_beta_candidate());
-    assert_eq!(ProviderAdmissionOwnerPinsV1::final_beta_candidate().switchyard_owner_head,
-        "c01fb1ee586d33a5031d1d928ce40fcabfb4f4f2");
-    assert_eq!(ProviderAdmissionOwnerPinsV1::prior_final_beta_candidate().switchyard_owner_head,
-        "4f85615ef6ebe5483ab96afe6e046b4ea10566c6");
+    check_candidate_tuple(ProviderAdmissionOwnerPinsV1::source_export_verified_candidate());
+    assert_eq!(
+        ProviderAdmissionOwnerPinsV1::final_beta_candidate().switchyard_owner_head,
+        "c01fb1ee586d33a5031d1d928ce40fcabfb4f4f2"
+    );
+    assert_eq!(
+        ProviderAdmissionOwnerPinsV1::prior_final_beta_candidate().switchyard_owner_head,
+        "4f85615ef6ebe5483ab96afe6e046b4ea10566c6"
+    );
     let mut hybrid = ProviderAdmissionOwnerPinsV1::final_beta_candidate();
     hybrid.switchyard_owner_head =
         ProviderAdmissionOwnerPinsV1::beta_candidate().switchyard_owner_head;
@@ -34,6 +39,62 @@ fn explicit_beta_owner_tuple_preserves_requirement_binding_without_fallback() {
     hybrid.switchyard_schema_sha256 =
         ProviderAdmissionOwnerPinsV1::beta_candidate().switchyard_schema_sha256;
     assert!(hybrid.validate().is_err());
+}
+
+#[test]
+fn source_export_verified_tuple_is_exact_and_retained_by_v3() {
+    let pins = ProviderAdmissionOwnerPinsV1::source_export_verified_candidate();
+    assert_eq!(
+        pins.codex_owner_head,
+        "97b0acd5ce2ccb3c87a763606696c35a450947f6"
+    );
+    assert_eq!(
+        pins.switchyard_owner_head,
+        "2d9fa4eb268eaa9a880af30159e6708db9bc0ba3"
+    );
+    assert_eq!(
+        pins.switchyard_schema_sha256,
+        "sha256:0e9c851cc9fad9538408ab44d84737d5f4d4d7ef39f2fd5db20c6f88fc7fbb9e"
+    );
+    assert_eq!(
+        pins.deterministic_fixture_sha256,
+        "sha256:cafa673ac58f60029fd6c1de229b4f57d9f42ba918b7ecb2a3bfb20cb2b41a31"
+    );
+
+    let profile = profile();
+    let mut requirement = requirement(&profile);
+    requirement.owner_pins = pins.clone();
+    requirement.seal().unwrap();
+    let request = WorkerStartRequestV3::from_v2_for_dispatch(
+        &canonical(&v2()),
+        &profile,
+        &requirement,
+        "dispatch-source-export-verified-1",
+        0,
+    )
+    .unwrap();
+    assert_eq!(request.codex_owner_head, pins.codex_owner_head);
+    assert_eq!(request.switchyard_owner_head, pins.switchyard_owner_head);
+    assert_eq!(
+        request.switchyard_schema_sha256,
+        pins.switchyard_schema_sha256
+    );
+    assert_eq!(
+        request.switchyard_deterministic_fixture_sha256,
+        pins.deterministic_fixture_sha256
+    );
+
+    for mutate in [
+        |value: &mut ProviderAdmissionOwnerPinsV1| value.codex_owner_head.push('0'),
+        |value: &mut ProviderAdmissionOwnerPinsV1| value.switchyard_owner_head.push('0'),
+        |value: &mut ProviderAdmissionOwnerPinsV1| value.switchyard_schema_sha256.push('0'),
+        |value: &mut ProviderAdmissionOwnerPinsV1| value.deterministic_fixture_sha256.push('0'),
+    ] as [fn(&mut ProviderAdmissionOwnerPinsV1); 4]
+    {
+        let mut changed = pins.clone();
+        mutate(&mut changed);
+        assert!(changed.validate().is_err());
+    }
 }
 
 fn check_candidate_tuple(pins: ProviderAdmissionOwnerPinsV1) {

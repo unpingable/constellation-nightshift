@@ -49,6 +49,10 @@ pub const ACCEPTED_SWITCHYARD_PROVIDER_ADMISSION_OWNER_HEAD: &str =
 const FINAL_CODEX_OWNER_HEAD: &str = "97b0acd5ce2ccb3c87a763606696c35a450947f6";
 const PRIOR_FINAL_SWITCHYARD_OWNER_HEAD: &str = "4f85615ef6ebe5483ab96afe6e046b4ea10566c6";
 const FINAL_SWITCHYARD_OWNER_HEAD: &str = "c01fb1ee586d33a5031d1d928ce40fcabfb4f4f2";
+// Corrected source-export candidate: every exported blob is read from this
+// immutable revision and the export manifest verifies the complete closure.
+const SOURCE_EXPORT_VERIFIED_SWITCHYARD_OWNER_HEAD: &str =
+    "2d9fa4eb268eaa9a880af30159e6708db9bc0ba3";
 const FINAL_SWITCHYARD_SCHEMA_SHA256: &str =
     "sha256:0e9c851cc9fad9538408ab44d84737d5f4d4d7ef39f2fd5db20c6f88fc7fbb9e";
 const FINAL_SWITCHYARD_SCHEMA_BYTES: &[u8] = include_bytes!(
@@ -719,6 +723,16 @@ pub struct ProviderAdmissionOwnerPinsV1 {
 }
 
 impl ProviderAdmissionOwnerPinsV1 {
+    /// Candidate whose Switchyard source export is bound to one immutable revision.
+    pub fn source_export_verified_candidate() -> Self {
+        Self {
+            codex_owner_head: FINAL_CODEX_OWNER_HEAD.to_owned(),
+            switchyard_owner_head: SOURCE_EXPORT_VERIFIED_SWITCHYARD_OWNER_HEAD.to_owned(),
+            switchyard_schema_sha256: FINAL_SWITCHYARD_SCHEMA_SHA256.to_owned(),
+            ..Self::accepted()
+        }
+    }
+
     /// Historical pre-precision-correction tuple, retained for exact replay.
     pub fn prior_final_beta_candidate() -> Self {
         Self {
@@ -761,6 +775,7 @@ impl ProviderAdmissionOwnerPinsV1 {
             && self != &Self::beta_candidate()
             && self != &Self::prior_final_beta_candidate()
             && self != &Self::final_beta_candidate()
+            && self != &Self::source_export_verified_candidate()
         {
             return Err(ContractError::InvalidField("provider admission owner pins"));
         }
