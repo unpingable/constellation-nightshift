@@ -12,8 +12,8 @@ nightshift --store ./unused.sqlite attention replay --bundle-stdin < ./attention
 Choose exactly one input option. Standard input accepts one JSON value, optional
 trailing whitespace, and at most16MiB. Extra JSON, oversized input, missing input
 selection and selecting both options refuse. The existing pathname option retains
-its regular-file and no-symlink requirements. The store locator is a required CLI
-parameter, but this replay command does not open or mutate that store.
+its regular-file and no-symlink requirements. The CLI also accepts a store locator,
+but this replay command does not open or mutate that store.
 
 Output has schema `nightshift.project-predicate-attention-replay/v1`, `matches`,
 and expected/recomputed receipt digests. A caller must require a successful exit,
