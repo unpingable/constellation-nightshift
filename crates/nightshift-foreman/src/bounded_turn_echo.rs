@@ -51,6 +51,13 @@ fn tick(value: &Value) -> bool {
         .is_some_and(|value| (-SAFE..=SAFE).contains(&value))
 }
 
+fn notification_wire(value: &Value) -> bool {
+    keys(value, &["method", "params", "emittedAtMs"])
+        && value["emittedAtMs"]
+            .as_i64()
+            .is_some_and(|value| (1..=SAFE).contains(&value))
+}
+
 fn output(value: &Value) -> bool {
     value
         .as_str()
@@ -286,7 +293,7 @@ pub(super) fn validate_snapshot(
                 expected = Some(INPUT_SHAPE);
             }
         } else if record["acquisition_kind"] == "NOTIFICATION" {
-            let closed_wire = keys(&wire, &["method", "params"]);
+            let closed_wire = notification_wire(&wire);
             let is_user = closed_wire && user_echo(method, params, binding, state.input.as_ref());
             let is_agent = closed_wire && agent_output(method, params, binding);
             if raw["byte_length"]
@@ -332,7 +339,7 @@ pub(super) fn validate_snapshot(
                     && params["threadId"] == binding["thread_id"]
             } else {
                 record["acquisition_kind"] == "NOTIFICATION"
-                    && keys(&wire, &["method", "params"])
+                    && notification_wire(&wire)
                     && wire["method"] == method
             };
             if !exact_method {
