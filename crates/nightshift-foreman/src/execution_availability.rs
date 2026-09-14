@@ -60,6 +60,9 @@ const PACKAGED_RUNTIME_SWITCHYARD_OWNER_HEAD: &str = "7df43b4e15cb1465f434e072b4
 const BOUNDED_TURN_SWITCHYARD_OWNER_HEAD: &str = "8479cb77dc76632e64b66e84c4f75c9765e421a6";
 // Candidate only; finalized from the independently frozen Switchyard successor.
 const BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str = "805e84d777eaab57c2108919ce43b09828e6e1ef";
+// Explicit raw-completion/runtime-preflight successor; old tuples remain replayable.
+const RAW_COMPLETION_ECHO_SWITCHYARD_OWNER_HEAD: &str =
+    "df9acbd044beaa4cb165dcb648341cc373aecd72";
 const PRIOR_BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str =
     "6fe1084dc1a0e8e39a5a6c2bc108b39ace682724";
 const EARLIER_BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str =
@@ -747,6 +750,14 @@ pub struct ProviderAdmissionOwnerPinsV1 {
 }
 
 impl ProviderAdmissionOwnerPinsV1 {
+    /// Separately enrolled installed raw-completion cohort, with the exact V2 schema.
+    pub fn raw_completion_echo_candidate() -> Self {
+        Self {
+            switchyard_owner_head: RAW_COMPLETION_ECHO_SWITCHYARD_OWNER_HEAD.to_owned(),
+            ..Self::bounded_turn_echo_candidate()
+        }
+    }
+
     /// Closed user echo and 32KiB output custody; separately enrolled, never fallback.
     pub fn bounded_turn_echo_candidate() -> Self {
         Self {
@@ -777,7 +788,8 @@ impl ProviderAdmissionOwnerPinsV1 {
     }
 
     fn is_bounded_turn_echo(&self) -> bool {
-        self == &Self::bounded_turn_echo_candidate()
+        self == &Self::raw_completion_echo_candidate()
+            || self == &Self::bounded_turn_echo_candidate()
             || self == &Self::prior_bounded_turn_echo_candidate()
             || self == &Self::earlier_bounded_turn_echo_candidate()
     }
@@ -849,6 +861,7 @@ impl ProviderAdmissionOwnerPinsV1 {
     }
     pub fn validate(&self) -> Result<(), ContractError> {
         if self != &Self::accepted()
+            && self != &Self::raw_completion_echo_candidate()
             && self != &Self::bounded_turn_echo_candidate()
             && self != &Self::prior_bounded_turn_echo_candidate()
             && self != &Self::earlier_bounded_turn_echo_candidate()

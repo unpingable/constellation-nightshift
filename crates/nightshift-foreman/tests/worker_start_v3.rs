@@ -19,6 +19,7 @@ type V3Substitution = Box<dyn Fn(&mut WorkerStartRequestV3)>;
 
 #[test]
 fn explicit_beta_owner_tuple_preserves_requirement_binding_without_fallback() {
+    check_candidate_tuple(ProviderAdmissionOwnerPinsV1::raw_completion_echo_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::bounded_turn_echo_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::prior_bounded_turn_echo_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::earlier_bounded_turn_echo_candidate());
@@ -44,6 +45,92 @@ fn explicit_beta_owner_tuple_preserves_requirement_binding_without_fallback() {
     hybrid.switchyard_schema_sha256 =
         ProviderAdmissionOwnerPinsV1::beta_candidate().switchyard_schema_sha256;
     assert!(hybrid.validate().is_err());
+}
+
+#[test]
+fn raw_completion_echo_tuple_and_installed_adapter_are_exact() {
+    const RUNNER: &str = "sha256:279e3e40e95637a83754ca0c81a354117329bc406435a5a4a164b9e842f6ee08";
+    let pins = ProviderAdmissionOwnerPinsV1::raw_completion_echo_candidate();
+    assert_eq!(
+        pins.switchyard_owner_head,
+        "df9acbd044beaa4cb165dcb648341cc373aecd72"
+    );
+    assert_eq!(
+        pins.codex_owner_head,
+        "97b0acd5ce2ccb3c87a763606696c35a450947f6"
+    );
+    assert_eq!(
+        pins.switchyard_schema_sha256,
+        "sha256:c851fb5dd157ebb70896da06db50a07b968b3c0d357b2defc73ca267b9d82f93"
+    );
+    assert_eq!(
+        pins.deterministic_fixture_sha256,
+        "sha256:cafa673ac58f60029fd6c1de229b4f57d9f42ba918b7ecb2a3bfb20cb2b41a31"
+    );
+    for mutate in [
+        |value: &mut ProviderAdmissionOwnerPinsV1| {
+            value.codex_owner_head = ProviderAdmissionOwnerPinsV1::accepted().codex_owner_head;
+        },
+        |value: &mut ProviderAdmissionOwnerPinsV1| {
+            value.switchyard_schema_sha256 =
+                ProviderAdmissionOwnerPinsV1::prior_bounded_turn_echo_candidate()
+                    .switchyard_schema_sha256;
+        },
+        |value: &mut ProviderAdmissionOwnerPinsV1| value.deterministic_fixture_sha256 = digest('e'),
+    ] as [fn(&mut ProviderAdmissionOwnerPinsV1); 3]
+    {
+        let mut mixed = pins.clone();
+        mutate(&mut mixed);
+        assert!(mixed.validate().is_err());
+    }
+    let mut profile = profile();
+    profile.schema = nightshift_foreman::FOREMAN_EXECUTION_PROFILE_SCHEMA_V3.to_owned();
+    profile.maximum_event_bytes = 16 * 1024 * 1024;
+    profile.maximum_worker_output_bytes = Some(32768);
+    profile.adapter_timeout_seconds = 120;
+    profile
+        .adapters
+        .get_mut("switchyard-codex")
+        .unwrap()
+        .executable_identity = RUNNER.to_owned();
+    profile.seal().unwrap();
+    let mut requirement = requirement(&profile);
+    requirement.owner_pins = pins;
+    requirement.adapter_executable_identity = RUNNER.to_owned();
+    requirement
+        .work_item_model_selections
+        .get_mut("WORK-A")
+        .unwrap()[0]
+        .model_id = "gpt-5.6-terra".to_owned();
+    requirement.seal().unwrap();
+    let mut start = v2();
+    start.timeout_seconds = 120;
+    start.maximum_output_bytes = 32768;
+    start.seal().unwrap();
+    let request = WorkerStartRequestV3::from_v2_for_dispatch(
+        &canonical(&start),
+        &profile,
+        &requirement,
+        "dispatch-raw-completion-1",
+        0,
+    )
+    .unwrap();
+    request
+        .validate_dispatch_graph(&profile, &requirement, &dispatch(&request, &requirement))
+        .unwrap();
+    assert_eq!(request.adapter_executable_identity, RUNNER);
+    assert_eq!(request.adapter_protocol, "switchyard.codex-app-server/v2");
+    assert_eq!(request.adapter_version, "2.0.0");
+    assert_eq!(request.timeout_seconds, 120);
+    assert_eq!(request.maximum_output_bytes, 32768);
+    assert_eq!(request.internal_provider_retry_count, 0);
+    assert!(!request.semantic_retry);
+    let mut mixed = request.clone();
+    mixed.adapter_executable_identity = digest('e');
+    mixed.seal().unwrap();
+    assert!(mixed
+        .validate_dispatch_graph(&profile, &requirement, &dispatch(&mixed, &requirement))
+        .is_err());
 }
 
 #[test]
