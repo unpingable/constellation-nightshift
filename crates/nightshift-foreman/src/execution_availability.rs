@@ -59,13 +59,15 @@ const PACKAGED_RUNTIME_SWITCHYARD_OWNER_HEAD: &str = "7df43b4e15cb1465f434e072b4
 // Independently frozen bounded-custody successor; selection needs new route approval.
 const BOUNDED_TURN_SWITCHYARD_OWNER_HEAD: &str = "8479cb77dc76632e64b66e84c4f75c9765e421a6";
 // Candidate only; finalized from the independently frozen Switchyard successor.
-const BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str = "6fe1084dc1a0e8e39a5a6c2bc108b39ace682724";
+const BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str = "6d00e125e4d54191a8034e8e6f201396cffb2c92";
 const PRIOR_BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str =
+    "6fe1084dc1a0e8e39a5a6c2bc108b39ace682724";
+const EARLIER_BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str =
     "ce5a3a0be8f90162581c820b85b2a785557aae24";
 const BOUNDED_TURN_ECHO_SWITCHYARD_SCHEMA_SHA256: &str =
-    "sha256:2bcf795c753a08d3c7e2ef8b521b44b155054fccbd50452662230d59ddd3f293";
+    "sha256:c851fb5dd157ebb70896da06db50a07b968b3c0d357b2defc73ca267b9d82f93";
 const BOUNDED_TURN_ECHO_SWITCHYARD_SCHEMA_BYTES: &[u8] = include_bytes!(
-    "../../../schemas/vendor/switchyard.codex-provider-admission.bounded-turn-echo.v1.schema.json"
+    "../../../schemas/vendor/switchyard.codex-provider-admission.bounded-turn-echo.v2.schema.json"
 );
 #[path = "bounded_turn_echo.rs"]
 mod bounded_turn_echo;
@@ -759,7 +761,17 @@ impl ProviderAdmissionOwnerPinsV1 {
         Self {
             codex_owner_head: FINAL_CODEX_OWNER_HEAD.to_owned(),
             switchyard_owner_head: PRIOR_BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD.to_owned(),
-            switchyard_schema_sha256: BOUNDED_TURN_ECHO_SWITCHYARD_SCHEMA_SHA256.to_owned(),
+            switchyard_schema_sha256:
+                "sha256:2bcf795c753a08d3c7e2ef8b521b44b155054fccbd50452662230d59ddd3f293".to_owned(),
+            ..Self::accepted()
+        }
+    }
+    pub fn earlier_bounded_turn_echo_candidate() -> Self {
+        Self {
+            codex_owner_head: FINAL_CODEX_OWNER_HEAD.to_owned(),
+            switchyard_owner_head: EARLIER_BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD.to_owned(),
+            switchyard_schema_sha256:
+                "sha256:2bcf795c753a08d3c7e2ef8b521b44b155054fccbd50452662230d59ddd3f293".to_owned(),
             ..Self::accepted()
         }
     }
@@ -767,6 +779,7 @@ impl ProviderAdmissionOwnerPinsV1 {
     fn is_bounded_turn_echo(&self) -> bool {
         self == &Self::bounded_turn_echo_candidate()
             || self == &Self::prior_bounded_turn_echo_candidate()
+            || self == &Self::earlier_bounded_turn_echo_candidate()
     }
     /// Separately selected bounded-request-custody source; never an automatic fallback.
     pub fn bounded_turn_candidate() -> Self {
