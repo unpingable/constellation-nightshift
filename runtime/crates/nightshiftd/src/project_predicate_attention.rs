@@ -1001,7 +1001,7 @@ pub fn read_json_from_reader<T: for<'de> Deserialize<'de>>(reader: impl Read) ->
 }
 
 fn decode_exact_json<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Result<T, String> {
-    let mut deserializer = serde_json::Deserializer::from_slice(&bytes);
+    let mut deserializer = serde_json::Deserializer::from_slice(bytes);
     let value = T::deserialize(&mut deserializer).map_err(|error| error.to_string())?;
     deserializer.end().map_err(|error| error.to_string())?;
     Ok(value)

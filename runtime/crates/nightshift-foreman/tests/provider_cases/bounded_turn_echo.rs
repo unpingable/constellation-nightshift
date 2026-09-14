@@ -94,6 +94,24 @@ fn expanded_vector() -> Value {
     snapshot
 }
 
+fn timestamped_echo_vector() -> Value {
+    let mut snapshot = expanded_vector();
+    let legacy_snapshot = snapshot.clone();
+    // The compact cross-language vector preserves the earlier two-field wire
+    // verbatim.  The current source-selected echo context adds its required
+    // timestamp to every notification: small agent-start frames participate
+    // in the same ordered lifecycle as large deltas and completions.
+    for index in 0..snapshot["records"].as_array().unwrap().len() {
+        if snapshot["records"][index]["acquisition_kind"] == "NOTIFICATION" {
+            snapshot = change(&snapshot, index, |value| {
+                value["emittedAtMs"] = json!((index + 1) as i64);
+            });
+        }
+    }
+    assert_ne!(snapshot, legacy_snapshot);
+    snapshot
+}
+
 #[test]
 fn bounded_turn_echo_cross_language_vector_is_exact() {
     let snapshot = expanded_vector();
@@ -105,7 +123,9 @@ fn bounded_turn_echo_cross_language_vector_is_exact() {
         .collect();
     assert_eq!(
         sizes,
-        [118500, 53, 118606, 118610, 249, 282, 155, 240, 196756, 196852, 196959]
+        [
+            118500, 53, 118606, 118610, 249, 282, 155, 240, 196756, 196852, 196959
+        ]
     );
     assert_eq!(
         wire(&snapshot["records"][9])["params"]["item"]["text"]
@@ -118,8 +138,19 @@ fn bounded_turn_echo_cross_language_vector_is_exact() {
 
 #[test]
 fn bounded_turn_echo_native_intake_replays_full_echo_and_output_custody() {
-    let snapshot = expanded_vector();
+    let snapshot = timestamped_echo_vector();
+    let legacy_wire_snapshot = expanded_vector();
     let negatives = vec![
+        legacy_wire_snapshot,
+        change(&snapshot, 2, |value| {
+            value.as_object_mut().unwrap().remove("emittedAtMs");
+        }),
+        change(&snapshot, 2, |value| {
+            value["emittedAtMs"] = json!(0);
+        }),
+        change(&snapshot, 2, |value| {
+            value["unexpected"] = json!(true);
+        }),
         change(&snapshot, 2, |value| {
             value["params"]["item"]["content"][0]["text"] = json!("replacement".repeat(12000))
         }),
@@ -174,7 +205,7 @@ fn bounded_turn_echo_native_intake_replays_full_echo_and_output_custody() {
 }
 
 fn sequential_vector(output_bytes: usize) -> Value {
-    let mut snapshot = expanded_vector();
+    let mut snapshot = timestamped_echo_vector();
     for index in [8, 9, 10] {
         snapshot = change(&snapshot, index, |value| match index {
             8 => value["params"]["delta"] = json!("\0".repeat(output_bytes)),
