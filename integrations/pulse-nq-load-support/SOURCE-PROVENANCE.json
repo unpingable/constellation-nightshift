@@ -1,5 +1,5 @@
 {
-  "canonical_revision": "9f39d878be2b064a8be4153841df16c101cbf2c4",
+  "canonical_revision": "0997dcb30b58def78537ceeeb469c779eb9905f1",
   "canonical_source": "https://github.com/unpingable/constellation-monitor",
   "layout_substitution": {
     "destination": "tests/process_boundary.rs",
@@ -23,19 +23,23 @@
     },
     "README.md": {
       "byte_length": 1542,
-      "sha256": "fd25d4413083c51fa3ca85e0cc9d62bbb7ce9474238c51abe7dcf5aebc8e183d"
+      "sha256": "fdff63ba6dcd23683353528e3c98fd6592020ad7934a985139420203e3dc4a91"
     },
     "THIRD_PARTY_NOTICES.md": {
       "byte_length": 2777,
       "sha256": "aced11396eb32b85c8c44072bfe5ca5d03fdb15b511dd85291b2071e0313fa60"
+    },
+    "docs/nq-host-load-pressure-support-v1.md": {
+      "byte_length": 4675,
+      "sha256": "32dd830fd5eb81a0df6fcbeb2f33bfb224e4adc80f1be8b2b307add1b2dd0f10"
     },
     "docs/pulse-closed-resolver-launcher.md": {
       "byte_length": 3446,
       "sha256": "144496d5ada35870178b95292bdd8577f943969c94c83e26fa6e70f0f5e675b4"
     },
     "src/lib.rs": {
-      "byte_length": 48721,
-      "sha256": "2f2d75af5ffcc525a5f5c37a0acc1cfeb0d3b6fe9054051507cf2fe6ad9fc834"
+      "byte_length": 50126,
+      "sha256": "c996b190055718cc322347299210d366750d876e455a23d0fb31e8c4d39874db"
     },
     "src/main.rs": {
       "byte_length": 3544,
@@ -60,13 +64,16 @@
       "sha256": "a12e9515429b1e7c04cbfd28859ff681f59acb26afc828dee3e2731c747aa479"
     },
     "crates/pulse-nq-load-support/src/lib.rs": {
-      "sha256": "2f2d75af5ffcc525a5f5c37a0acc1cfeb0d3b6fe9054051507cf2fe6ad9fc834"
+      "sha256": "c996b190055718cc322347299210d366750d876e455a23d0fb31e8c4d39874db"
     },
     "crates/pulse-nq-load-support/src/main.rs": {
       "sha256": "9396ba1093f91826417452a73c4b5f7001cd49dc9a8b20f1e04c9d60e927e88c"
     },
     "crates/pulse-nq-load-support/tests/process_boundary.rs": {
       "sha256": "b28720cb087fa2217974114a73d903d859fc880546ca51fd64e7cdeaf90376f0"
+    },
+    "docs/nq-host-load-pressure-support-v1.md": {
+      "sha256": "32dd830fd5eb81a0df6fcbeb2f33bfb224e4adc80f1be8b2b307add1b2dd0f10"
     },
     "docs/pulse-closed-resolver-launcher.md": {
       "sha256": "144496d5ada35870178b95292bdd8577f943969c94c83e26fa6e70f0f5e675b4"

@@ -33,6 +33,11 @@ pub const PROFILE_DIGEST: &str =
     "sha256:c8c10fed1cc5598d953b4defbc98e8c106fc59e035c249d43681698a5c7b4ff9";
 pub const PROFILE_SEMANTIC_ID: &str =
     "sha256:f500ddf6bf3b61e5e65bcec8fbf8bfa2b38728fa9949c9406480b6941a0cbec0";
+/// Explicit successor cohort, not a wildcard for matching descriptors. NQ's
+/// conservative identity also binds dependency manifests; each deployment
+/// still selects one exact identity and receipts cannot cross between them.
+pub const LOCAL_SUCCESSOR_PROFILE_SEMANTIC_ID: &str =
+    "sha256:fb7bce89e23f88174e87309002b78a9fc78e45db748252cc76aff0ecade79490";
 pub const THRESHOLD_POLICY_ID: &str = "nq.host.load_pressure.threshold_policy";
 pub const THRESHOLD_POLICY_VERSION: &str = "1";
 pub const THRESHOLD_POLICY_DIGEST: &str =
@@ -153,7 +158,9 @@ impl LoadSupportConfigV1 {
             PROFILE_VERSION,
             PROFILE_DIGEST,
         )?;
-        if self.profile_semantic_id != PROFILE_SEMANTIC_ID {
+        if self.profile_semantic_id != PROFILE_SEMANTIC_ID
+            && self.profile_semantic_id != LOCAL_SUCCESSOR_PROFILE_SEMANTIC_ID
+        {
             return Err("profile_semantic_id is not the qualified NQ host v1 identity".into());
         }
         require_identity(
@@ -1159,6 +1166,27 @@ mod tests {
         assert_eq!(
             config.validate().unwrap_err(),
             "profile_semantic_id is not the qualified NQ host v1 identity"
+        );
+    }
+
+    #[test]
+    fn local_successor_identity_is_explicit_and_cannot_relabel_prior_evidence() {
+        let (_root, mut config) = fixture();
+        let reads = Cell::new(0);
+        acquire(&config, "support:prior-cohort", "0.50", 100, &reads);
+        config.profile_semantic_id = LOCAL_SUCCESSOR_PROFILE_SEMANTIC_ID.into();
+        config.validate().expect("explicit successor cohort");
+        let clock = FixedClock {
+            clock_id: "clock:boot-one",
+            tick_ms: Cell::new(200),
+        };
+        assert!(ingest_with(&config, "support:prior-cohort", &clock).is_err());
+        acquire(&config, "support:successor-cohort", "0.50", 300, &reads);
+        assert_eq!(reads.get(), 4, "new occurrence acquires its own support");
+        config.profile_semantic_id = format!("sha256:{}", "a".repeat(64));
+        assert!(
+            config.validate().is_err(),
+            "arbitrary descriptor-equivalent identity refuses"
         );
     }
 

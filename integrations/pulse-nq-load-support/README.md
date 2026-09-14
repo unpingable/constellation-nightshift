@@ -2,7 +2,7 @@
 
 This source-only Apache-2.0 distribution contains the bounded host-load evidence
 adapter used by an explicitly configured Nightshift integration. Canonical source
-revision: `9f39d878be2b064a8be4153841df16c101cbf2c4`. See `SOURCE-PROVENANCE.json` for exact source and layout
+revision: `0997dcb30b58def78537ceeeb469c779eb9905f1`. See `SOURCE-PROVENANCE.json` for exact source and layout
 bindings.
 
 Build the provided cut with Rust 1.85 or newer using `cargo build --locked`; run
