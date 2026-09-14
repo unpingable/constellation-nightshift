@@ -41,6 +41,12 @@ exercise actual acquisition, NQ admission, support and attention, ending in an
 intentional no-network delivery refusal. Select its own manifest when building
 those components. No private sibling dependency or live notification is implied.
 
+The additive [saved-check selector](../runtime/docs/SAVED-CHECK-RECURRENCE.md)
+uses canonical recurrence slots to choose one desired local check. Its small
+example tests slot identity and clock refusal only; it is not an automatic
+monitoring runner or evidence acquisition. Run its focused gate with
+`cargo test --locked --manifest-path runtime/Cargo.toml -p nightshiftd --lib saved_check_recurrence`.
+
 The repository-root workspace remains the predecessor command set. Its
 Diagnostics, Watchbill, Runs, NQ, Liveness, and agenda-keyed Attention commands
 are not aliases for `runtime/` and remain available from existing immutable

@@ -46,6 +46,7 @@ use nightshiftd::repository_qualification::{
 use nightshiftd::reservation_qualification::{
     NqNgReservationVerifierV1, ReservationApplicabilityProfileV1, ReservationRealizationStoreV1,
 };
+use nightshiftd::saved_check_recurrence::SavedCheckScheduleV1;
 use nightshiftd::steady_state_evidence::{
     SteadyStateEvidenceProfileV1, SteadyStateObservationHandoffV1, SteadyStateObservationVerifierV1,
 };
@@ -102,6 +103,23 @@ enum Command {
     Packet {
         #[command(subcommand)]
         command: PacketCommand,
+    },
+    /// Select one deterministic desired saved-check occurrence; performs no execution.
+    SavedCheck {
+        #[command(subcommand)]
+        command: SavedCheckCommand,
+    },
+}
+#[derive(Debug, Subcommand)]
+enum SavedCheckCommand {
+    /// Select one slot; does not acquire a source or reserve an execution.
+    Schedule {
+        #[arg(long)]
+        policy: PathBuf,
+        #[arg(long)]
+        scheduler_clock_id: String,
+        #[arg(long)]
+        at: String,
     },
 }
 
@@ -540,6 +558,23 @@ fn main() -> anyhow::Result<()> {
             run_reservation_qualification_command(&arguments.store, command)
         }
         Command::Packet { command } => run_packet_command(command),
+        Command::SavedCheck { command } => run_saved_check_command(command),
+    }
+}
+
+fn run_saved_check_command(command: SavedCheckCommand) -> anyhow::Result<()> {
+    match command {
+        SavedCheckCommand::Schedule {
+            policy,
+            scheduler_clock_id,
+            at,
+        } => {
+            let policy: SavedCheckScheduleV1 = read_exact_canonical(&policy)?;
+            let selection = policy
+                .select(&scheduler_clock_id, parse_time(&at)?)
+                .map_err(anyhow::Error::msg)?;
+            write_exact(&selection)
+        }
     }
 }
 
