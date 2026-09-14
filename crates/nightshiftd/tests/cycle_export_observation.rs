@@ -128,6 +128,7 @@ fn posture_only_request(observation_id: &str) -> CanonicalCycleRequestV1 {
         temporal_policy: None,
         proposal: None,
         authoring_context: None,
+        reviewed_plan_binding: None,
     }
     .seal()
     .unwrap()

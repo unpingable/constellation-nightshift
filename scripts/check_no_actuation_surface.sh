@@ -193,9 +193,10 @@ fi
 
 # The only process boundaries are exact, closed ports: read-only NQ admission
 # qualification, present-support resolution, exact Pulse receipt replay,
-# exact NQ repository-qualification replay, exact NQ reservation-realization replay, and AG occurrence opening/status.
-# Any seventh site is a new runtime authority or
-# execution surface and fails closed.
+# exact NQ repository-qualification replay, exact NQ reservation-realization
+# replay, the retained saved-check verifier, and AG occurrence opening/status.
+# Any other process site is a new runtime authority or execution surface and
+# fails closed.
 mapfile -t command_files < <(rg -l 'Command::new' "$production_src" | sort)
 expected_command_files=(
     crates/nightshiftd/src/ag_port.rs
@@ -204,6 +205,7 @@ expected_command_files=(
     crates/nightshiftd/src/project_predicate_attention.rs
     crates/nightshiftd/src/repository_qualification.rs
     crates/nightshiftd/src/reservation_qualification.rs
+    crates/nightshiftd/src/saved_check_runtime.rs
 )
 if [ "${command_files[*]}" != "${expected_command_files[*]}" ]; then
     fail "production subprocess files are not the exact closed port set: ${command_files[*]:-<none>}"
@@ -294,7 +296,7 @@ for forbidden_ag_verb in authorize dispatch retry reconcile standing resume halt
         cat /tmp/nightshift_exclusivity_hits >&2
     fi
 done
-for required_ag_verb in init continue record-proposal status; do
+for required_ag_verb in init continue record-proposal status inspect verify-runtime-profile-v2; do
     if ! rg -q "\"${required_ag_verb}\"" crates/nightshiftd/src/ag_port.rs; then
         fail "Nightshift AG port lost required closed verb ${required_ag_verb}"
     fi

@@ -35,7 +35,9 @@ The production executable surface is two binaries:
 
 - `nightshift` — the canonical observation-cycle runtime. Its only
   consequence-adjacent port is `ag-loopctl`, restricted to `status`, `init`,
-  `continue`, and `record-proposal`. It has no standing, authorization,
+  `continue`, and `record-proposal`; protected V2 ingress additionally makes
+  read-only `inspect` and `verify-runtime-profile-v2` calls to compare the
+  configured profile with AG's genesis-bound profile. It has no standing, authorization,
   dispatch, retry, reconciliation, Docket, executor, or human-disposition
   command. Its separate generic `attention` surface may invoke the exact
   content-pinned `pulse-project-predicate-support replay` verifier and append
@@ -563,6 +565,15 @@ an executable named `pulse-support-resolver`. AG options are required only
 when the request contains an exact precompiled proposal; the complete set is
 the AG CLI, database, observation-resolver locator and expected identity, and
 runtime-profile locator.
+
+`cycle run-config` and `recover-config` retain the same closed V1 cycle
+configuration. The four executable byte pins (NQ, AG CLI, observation resolver,
+and present-evidence resolver) are streamed through a fixed-size buffer with a
+256 MiB file ceiling. Configuration and exact JSON request bytes retain their
+separate 16 MiB ceiling. Executable pin verification rejects empty/nonregular
+files, symlinks on Unix, digest mismatch, and observed file changes during
+hashing. A verified pathname is not execution custody or authorization; this
+loading check does not acquire evidence, invoke a provider, or grant an effect.
 
 For continuity-bearing NQ V2 provenance, `cycle run` additionally accepts an
 all-or-none Standing Ed25519 public-key path, key ID, and NQ audience. These

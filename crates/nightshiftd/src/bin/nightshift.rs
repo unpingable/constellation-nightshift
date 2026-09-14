@@ -8,7 +8,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context as _};
 use chrono::{DateTime, Utc};
 use clap::{Args as ClapArgs, Parser, Subcommand, ValueEnum};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use sha2::{Digest as _, Sha256};
 
 use nightshiftd::ag_port::{
     parse_ag_refusal, AgLoopCtlPortV1, AgOccurrencePortV1, AgOpenOccurrenceRequestV1,
@@ -20,7 +21,8 @@ use nightshiftd::canonical_runtime::{
     CanonicalCycleRequestV1, CanonicalRuntime, CycleRunOutcomeV1,
 };
 use nightshiftd::canonical_store::{
-    AgOccurrenceReferenceV1, CanonicalStore, ObservationCycleId, ObservationCycleV1,
+    AgOccurrenceReferenceV1, AgProfileBindingV1, CanonicalStore, ObservationCycleId,
+    ObservationCycleV1,
 };
 use nightshiftd::continuity_authority::ContinuityAuthorityVerifierV1;
 use nightshiftd::currentness::{
@@ -63,6 +65,9 @@ use nightshiftd::substrate_origin::{
 };
 
 const MAX_EXACT_INPUT_BYTES: u64 = 16 * 1024 * 1024;
+// Executable identities are streamed, not parsed as JSON or buffered wholesale.
+// This matches the adjacent AG runtime's bounded executable identity envelope.
+const MAX_PINNED_PROGRAM_BYTES: u64 = 256 * 1024 * 1024;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -373,6 +378,15 @@ enum ExternalObservationCommand {
 enum CycleCommand {
     /// Run the sole production observation-cycle path.
     Run(Box<CycleRunArguments>),
+    /// Run one sealed AG-bound cycle using only a deployment-owned, content
+    /// pinned configuration.  The request supplies no executable or store
+    /// pathname selection.
+    RunConfig {
+        #[arg(long)]
+        config: PathBuf,
+        #[arg(long)]
+        request: PathBuf,
+    },
     /// Read one exact AG occurrence through AG and record status only.
     SyncAg {
         #[arg(long)]
@@ -414,6 +428,14 @@ enum CycleCommand {
         ag_runtime_profile: PathBuf,
         #[arg(long)]
         observed_at: String,
+    },
+    /// Query AG for the one durable prepared occurrence bound by this exact
+    /// sealed request.  This never sweeps unrelated recovery candidates.
+    RecoverConfig {
+        #[arg(long)]
+        config: PathBuf,
+        #[arg(long)]
+        request: PathBuf,
     },
     Show {
         #[arg(long)]
@@ -548,6 +570,217 @@ struct CycleRunArguments {
     decision_evidence_profile: Option<PathBuf>,
     #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
     format: OutputFormat,
+}
+
+const AG_CYCLE_CONFIG_SCHEMA_V1: &str = "nightshift.ag_cycle_config.v1";
+
+fn require_digest(name: &str, value: &str) -> anyhow::Result<()> {
+    let Some(hex) = value.strip_prefix("sha256:") else {
+        bail!("{name} must use sha256:<64 lowercase hex>");
+    };
+    if hex.len() != 64
+        || !hex
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        bail!("{name} must use sha256:<64 lowercase hex>");
+    }
+    Ok(())
+}
+
+/// Fixed byte pin for an executable or immutable configuration dependency.
+/// Mutable SQLite state is deliberately represented only by its fixed path.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct PinnedFileV1 {
+    path: PathBuf,
+    sha256: String,
+}
+
+impl PinnedFileV1 {
+    fn verify_program(&self, field: &str) -> anyhow::Result<()> {
+        if !self.path.is_absolute() {
+            bail!("{field}.path must be absolute");
+        }
+        if self.sha256 != pinned_program_digest(&self.path)? {
+            bail!("{field} digest does not match its configured bytes");
+        }
+        Ok(())
+    }
+
+    fn read_program(self, field: &str) -> anyhow::Result<PathBuf> {
+        self.verify_program(field)?;
+        Ok(self.path)
+    }
+
+    fn verify(&self, field: &str) -> anyhow::Result<()> {
+        if !self.path.is_absolute() {
+            bail!("{field}.path must be absolute");
+        }
+        let bytes = read_exact_bytes(&self.path)?;
+        let actual = format!("sha256:{:x}", Sha256::digest(bytes));
+        if self.sha256 != actual {
+            bail!("{field} digest does not match its configured bytes");
+        }
+        Ok(())
+    }
+
+    fn read(self, field: &str) -> anyhow::Result<PathBuf> {
+        self.verify(field)?;
+        Ok(self.path)
+    }
+}
+
+/// Closed operational coordinates for the AG-bound cycle port.  V1 pins the
+/// current production run surface only; it deliberately excludes optional
+/// evidence, custody, continuity, and substrate switches.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct AgCycleConfigV1 {
+    schema: String,
+    store: PathBuf,
+    present_evidence_resolver: PinnedFileV1,
+    nq_program: PinnedFileV1,
+    nq_config: PinnedFileV1,
+    nq_source_id: String,
+    ag_loopctl: PinnedFileV1,
+    ag_database: PathBuf,
+    ag_observation_resolver: PinnedFileV1,
+    ag_observation_resolver_id: String,
+    /// This profile locates the V2 profile verified by AG's genesis-bound
+    /// store law. It is intentionally not byte-pinned here: that profile
+    /// pins this config, so a reciprocal byte pin would form an identity
+    /// cycle rather than an independently verifiable relation.
+    ag_runtime_profile: PathBuf,
+    shared_admission_requirement_digest: String,
+    /// A configured coordinate for an AG status query.  It is not refreshed
+    /// by recovery and therefore cannot establish new currentness.
+    recover_observed_at: String,
+}
+
+// Retained recovery coordinates locate the existing owners; they do not renew
+// the observation timestamp or grant authority for a successor run.
+type AgCycleRecoveryCoordinatesV1 = (
+    PathBuf,
+    PathBuf,
+    PathBuf,
+    PathBuf,
+    String,
+    PathBuf,
+    DateTime<Utc>,
+    AgProfileBindingV1,
+);
+
+impl AgCycleConfigV1 {
+    fn validate_static_pins(&self) -> anyhow::Result<()> {
+        self.present_evidence_resolver
+            .verify_program("present_evidence_resolver")?;
+        self.nq_program.verify_program("nq_program")?;
+        self.nq_config.verify("nq_config")?;
+        self.ag_loopctl.verify_program("ag_loopctl")?;
+        self.ag_observation_resolver
+            .verify_program("ag_observation_resolver")?;
+        Ok(())
+    }
+
+    fn profile_binding(&self) -> anyhow::Result<AgProfileBindingV1> {
+        if !self.ag_runtime_profile.is_absolute() {
+            bail!("ag_runtime_profile path must be absolute");
+        }
+        require_digest(
+            "shared_admission_requirement_digest",
+            &self.shared_admission_requirement_digest,
+        )?;
+        Ok(AgProfileBindingV1 {
+            runtime_profile_digest: None,
+            shared_admission_requirement_digest: self.shared_admission_requirement_digest.clone(),
+        })
+    }
+
+    fn into_run_arguments(
+        self,
+        request: PathBuf,
+    ) -> anyhow::Result<(PathBuf, CycleRunArguments, AgProfileBindingV1)> {
+        if self.schema != AG_CYCLE_CONFIG_SCHEMA_V1 {
+            bail!("unsupported AG cycle config schema");
+        }
+        if !self.store.is_absolute() || !self.ag_database.is_absolute() {
+            bail!("AG cycle store and AG database paths must be absolute");
+        }
+        if self.nq_source_id.trim().is_empty() || self.ag_observation_resolver_id.trim().is_empty()
+        {
+            bail!("AG cycle configuration identities must be non-empty");
+        }
+        parse_time(&self.recover_observed_at)?;
+        self.validate_static_pins()?;
+        let profile_binding = self.profile_binding()?;
+        Ok((
+            self.store,
+            CycleRunArguments {
+                request,
+                present_evidence_resolver: self
+                    .present_evidence_resolver
+                    .read_program("present_evidence_resolver")?,
+                nq_program: self.nq_program.read_program("nq_program")?,
+                nq_config: self.nq_config.read("nq_config")?,
+                nq_source_id: self.nq_source_id,
+                standing_continuity_public_key: None,
+                standing_continuity_key_id: None,
+                standing_continuity_nq_audience: None,
+                substrate_origin_public_key: None,
+                substrate_origin_profile_id: None,
+                substrate_origin_subject_ref: None,
+                substrate_origin_issuer_id: None,
+                substrate_origin_key_id: None,
+                substrate_origin_namespace: None,
+                substrate_origin_linode_instance_id_sha256: None,
+                substrate_origin_bootstrap_coordinate_ref: None,
+                ag_loopctl: Some(self.ag_loopctl.read_program("ag_loopctl")?),
+                ag_database: Some(self.ag_database),
+                ag_observation_resolver: Some(
+                    self.ag_observation_resolver
+                        .read_program("ag_observation_resolver")?,
+                ),
+                ag_observation_resolver_id: Some(self.ag_observation_resolver_id),
+                ag_runtime_profile: Some(self.ag_runtime_profile),
+                maude_authoring_handoff: None,
+                maude_custody_credential: None,
+                maude_producer_principal_id: None,
+                maude_producer_key_id: None,
+                maude_session_custody_credential: None,
+                maude_session_issuer_principal_id: None,
+                maude_session_issuer_key_id: None,
+                nightshift_runtime_id: None,
+                external_evidence_profile: None,
+                decision_evidence_profile: None,
+                format: OutputFormat::Json,
+            },
+            profile_binding,
+        ))
+    }
+
+    fn recovery_coordinates(self) -> anyhow::Result<AgCycleRecoveryCoordinatesV1> {
+        if self.schema != AG_CYCLE_CONFIG_SCHEMA_V1 {
+            bail!("unsupported AG cycle config schema");
+        }
+        if !self.store.is_absolute() || !self.ag_database.is_absolute() {
+            bail!("AG cycle store and AG database paths must be absolute");
+        }
+        let observed_at = parse_time(&self.recover_observed_at)?;
+        self.validate_static_pins()?;
+        let profile_binding = self.profile_binding()?;
+        Ok((
+            self.store,
+            self.ag_loopctl.read_program("ag_loopctl")?,
+            self.ag_database,
+            self.ag_observation_resolver
+                .read_program("ag_observation_resolver")?,
+            self.ag_observation_resolver_id,
+            self.ag_runtime_profile,
+            observed_at,
+            profile_binding,
+        ))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -1000,7 +1233,35 @@ fn run_external_observation_command(
 }
 
 fn run_cycle_command(store_path: &Path, command: CycleCommand) -> anyhow::Result<()> {
+    run_cycle_command_bound(store_path, command, None)
+}
+
+fn run_cycle_command_bound(
+    store_path: &Path,
+    command: CycleCommand,
+    ag_profile_binding: Option<AgProfileBindingV1>,
+) -> anyhow::Result<()> {
     match command {
+        CycleCommand::RunConfig { config, request } => {
+            let sealed: CanonicalCycleRequestV1 = read_exact_canonical(&request)?;
+            sealed.validate().map_err(anyhow::Error::msg)?;
+            if sealed.proposal.is_none() {
+                bail!("config run requires an AG-bound sealed proposal");
+            }
+            if sealed.reviewed_plan_binding.is_none() {
+                bail!("protected V2 config run requires a sealed reviewed plan binding");
+            }
+            if sealed.authoring_context.is_some() {
+                bail!("config run does not configure Maude custody material");
+            }
+            let config: AgCycleConfigV1 = read_exact_canonical(&config)?;
+            let (configured_store, arguments, binding) = config.into_run_arguments(request)?;
+            run_cycle_command_bound(
+                &configured_store,
+                CycleCommand::Run(Box::new(arguments)),
+                Some(binding),
+            )
+        }
         CycleCommand::Run(arguments) => {
             let CycleRunArguments {
                 request,
@@ -1251,11 +1512,15 @@ fn run_cycle_command(store_path: &Path, command: CycleCommand) -> anyhow::Result
                     )?,
                     (None, None) => CanonicalRuntime::new(&mut store, nq, &mut support, &mut ag),
                 };
-                match custody_verifier.as_ref() {
-                    Some(verifier) => {
+                match (custody_verifier.as_ref(), ag_profile_binding) {
+                    (Some(_), Some(_)) => bail!("config binding cannot combine with Maude custody"),
+                    (Some(verifier), None) => {
                         runtime.run_cycle_with_authoring_custody(request, verifier)?
                     }
-                    None => runtime.run_cycle(request)?,
+                    (None, Some(binding)) => {
+                        runtime.run_cycle_with_ag_profile_binding(request, binding)?
+                    }
+                    (None, None) => runtime.run_cycle(request)?,
                 }
             } else {
                 if ag_loopctl.is_some()
@@ -1268,6 +1533,9 @@ fn run_cycle_command(store_path: &Path, command: CycleCommand) -> anyhow::Result
                 }
                 let mut ag = NoAgPort;
                 let mut runtime = CanonicalRuntime::new(&mut store, nq, &mut support, &mut ag);
+                if ag_profile_binding.is_some() {
+                    bail!("AG profile binding requires an AG-bound proposal");
+                }
                 match custody_verifier.as_ref() {
                     Some(verifier) => {
                         runtime.run_cycle_with_authoring_custody(request, verifier)?
@@ -1339,6 +1607,75 @@ fn run_cycle_command(store_path: &Path, command: CycleCommand) -> anyhow::Result
                 }
             }
             write_exact(&recovered)
+        }
+        CycleCommand::RecoverConfig { config, request } => {
+            let config: AgCycleConfigV1 = read_exact_canonical(&config)?;
+            let (
+                configured_store,
+                ag_loopctl,
+                ag_database,
+                ag_observation_resolver,
+                ag_observation_resolver_id,
+                ag_runtime_profile,
+                observed_at,
+                mut profile_binding,
+            ) = config.recovery_coordinates()?;
+            let request: CanonicalCycleRequestV1 = read_exact_canonical(&request)?;
+            request.validate().map_err(anyhow::Error::msg)?;
+            let proposal = request
+                .proposal
+                .as_ref()
+                .context("config recovery requires an AG-bound sealed proposal")?;
+            let source_request_digest = format!(
+                "sha256:{:x}",
+                Sha256::digest(
+                    serde_jcs::to_vec(&request)
+                        .context("canonicalize sealed request for recovery")?,
+                )
+            );
+            let mut ag = AgLoopCtlPortV1::new(
+                ag_loopctl,
+                ag_database,
+                ag_observation_resolver,
+                ag_observation_resolver_id,
+                ag_runtime_profile,
+            )
+            .map_err(anyhow::Error::msg)?;
+            // Config-run persists the AG-reopened profile digest, rather than
+            // the unverified locator. Reopen the same relation before matching
+            // its one retained prepared request; otherwise every valid V2
+            // recovery would compare `None` to the persisted digest.
+            profile_binding.runtime_profile_digest =
+                ag.runtime_profile_digest().map_err(anyhow::Error::msg)?;
+            profile_binding
+                .validate_prepared()
+                .map_err(|error| anyhow::Error::msg(error.to_string()))?;
+            let mut store = CanonicalStore::open(&configured_store)?;
+            let cycle = store
+                .list_cycles()?
+                .into_iter()
+                .filter(|cycle| {
+                    cycle.prepared_ag_request.as_ref().is_some_and(|prepared| {
+                        prepared.campaign_id == proposal.campaign_id
+                            && prepared.occurrence_id == proposal.occurrence_id
+                            && prepared.source_cycle_request_id.as_deref()
+                                == Some(request.request_id.as_str())
+                            && prepared.source_cycle_request_digest.as_deref()
+                                == Some(source_request_digest.as_str())
+                            && prepared.ag_profile_binding.as_ref() == Some(&profile_binding)
+                            && prepared.exact_request == proposal.proposal_input
+                    })
+                })
+                .collect::<Vec<_>>();
+            let [cycle] = cycle.as_slice() else {
+                bail!("exact sealed request must match exactly one durable prepared AG request");
+            };
+            let mut support = NoPresentEvidencePort;
+            let nq = NoNqAdmissionPort;
+            write_exact(
+                &CanonicalRuntime::new(&mut store, nq, &mut support, &mut ag)
+                    .sync_ag(&cycle.cycle_id, observed_at)?,
+            )
         }
         CycleCommand::RecordRefusal {
             cycle_id,
@@ -1480,6 +1817,70 @@ fn read_exact<T: DeserializeOwned>(path: &Path) -> anyhow::Result<T> {
     decode_exact(&bytes, path)
 }
 
+fn pinned_program_digest(path: &Path) -> anyhow::Result<String> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    let mut file = options
+        .open(path)
+        .with_context(|| format!("open pinned program {}", path.display()))?;
+    let before = file.metadata()?;
+    if !before.is_file() || before.len() == 0 || before.len() > MAX_PINNED_PROGRAM_BYTES {
+        bail!(
+            "pinned program must be a nonempty regular file within 256 MiB: {}",
+            path.display()
+        );
+    }
+    let mut hasher = Sha256::new();
+    let mut observed = 0_u64;
+    let mut buffer = [0_u8; 65536];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        observed += count as u64;
+        if observed > MAX_PINNED_PROGRAM_BYTES {
+            bail!("pinned program exceeds 256 MiB: {}", path.display());
+        }
+        hasher.update(&buffer[..count]);
+    }
+    let after = file.metadata()?;
+    if observed != before.len() || !same_pinned_program_metadata(&before, &after) {
+        bail!("pinned program changed during hashing: {}", path.display());
+    }
+    let located = std::fs::symlink_metadata(path)?;
+    if !located.is_file() || !same_pinned_program_metadata(&after, &located) {
+        bail!(
+            "pinned program pathname changed during hashing: {}",
+            path.display()
+        );
+    }
+    Ok(format!("sha256:{:x}", hasher.finalize()))
+}
+
+fn same_pinned_program_metadata(left: &std::fs::Metadata, right: &std::fs::Metadata) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        left.dev() == right.dev()
+            && left.ino() == right.ino()
+            && left.len() == right.len()
+            && left.mtime() == right.mtime()
+            && left.mtime_nsec() == right.mtime_nsec()
+            && left.ctime() == right.ctime()
+            && left.ctime_nsec() == right.ctime_nsec()
+    }
+    #[cfg(not(unix))]
+    {
+        left.len() == right.len() && left.modified().ok() == right.modified().ok()
+    }
+}
+
 fn read_exact_bytes(path: &Path) -> anyhow::Result<Vec<u8>> {
     let mut options = OpenOptions::new();
     options.read(true);
@@ -1598,6 +1999,113 @@ mod exact_input_tests {
     }
 
     #[test]
+    fn pinned_cycle_dependency_rejects_content_mutation() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("fixed-dependency");
+        std::fs::write(&path, b"qualified bytes").unwrap();
+        let pin = PinnedFileV1 {
+            path,
+            sha256: format!("sha256:{:x}", Sha256::digest(b"qualified bytes")),
+        };
+        pin.verify("dependency").unwrap();
+        std::fs::write(&pin.path, b"different bytes").unwrap();
+        assert!(pin.verify("dependency").is_err());
+    }
+
+    #[test]
+    fn pinned_program_above_json_bound_is_streamed_but_config_is_still_refused() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("large-program");
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_len(MAX_EXACT_INPUT_BYTES + 1).unwrap();
+        let mut expected = Sha256::new();
+        for _ in 0..MAX_EXACT_INPUT_BYTES / 1024 {
+            expected.update([0_u8; 1024]);
+        }
+        expected.update([0_u8]);
+        let pin = PinnedFileV1 {
+            path,
+            sha256: format!("sha256:{:x}", expected.finalize()),
+        };
+        pin.verify_program("nq_program").unwrap();
+        assert!(pin.verify("nq_config").is_err());
+        assert!(read_exact_bytes(&pin.path).is_err());
+        pin.read_program("nq_program").unwrap();
+    }
+
+    #[test]
+    fn pinned_program_rejects_oversize_empty_nonregular_and_content_mutation() {
+        let directory = tempfile::tempdir().unwrap();
+        assert!(pinned_program_digest(directory.path()).is_err());
+        let path = directory.path().join("program");
+        let file = std::fs::File::create(&path).unwrap();
+        assert!(pinned_program_digest(&path).is_err());
+        file.set_len(MAX_PINNED_PROGRAM_BYTES + 1).unwrap();
+        assert!(pinned_program_digest(&path).is_err());
+        std::fs::write(&path, b"qualified program bytes").unwrap();
+        let pin = PinnedFileV1 {
+            path,
+            sha256: format!("sha256:{:x}", Sha256::digest(b"qualified program bytes")),
+        };
+        pin.verify_program("program").unwrap();
+        std::fs::write(&pin.path, b"substituted program bytes").unwrap();
+        assert!(pin.verify_program("program").is_err());
+        #[cfg(unix)]
+        {
+            let linked = directory.path().join("linked-program");
+            std::os::unix::fs::symlink(&pin.path, &linked).unwrap();
+            assert!(pinned_program_digest(&linked).is_err());
+        }
+    }
+
+    #[test]
+    fn qualified_real_cycle_config_program_loading_when_supplied() {
+        let Some(path) = std::env::var_os("NIGHTSHIFT_QUALIFY_CYCLE_CONFIG") else {
+            return;
+        };
+        let config: AgCycleConfigV1 = read_exact(Path::new(&path)).unwrap();
+        let expected_program = config.nq_program.path.clone();
+        assert!(std::fs::metadata(&expected_program).unwrap().len() > MAX_EXACT_INPUT_BYTES);
+        let (_, arguments, _) = config
+            .into_run_arguments(PathBuf::from("/not-executed-qualification-request.json"))
+            .unwrap();
+        assert_eq!(arguments.nq_program, expected_program);
+        let recovery: AgCycleConfigV1 = read_exact(Path::new(&path)).unwrap();
+        recovery.recovery_coordinates().unwrap();
+        // Loading validates every real configured byte pin; it does not invoke
+        // the program, open a runtime store, or acquire an observation.
+    }
+
+    #[test]
+    fn cycle_config_requires_absolute_mutable_store_coordinates() {
+        let directory = tempfile::tempdir().unwrap();
+        let dependency = directory.path().join("dependency");
+        std::fs::write(&dependency, b"qualified bytes").unwrap();
+        let pin = || PinnedFileV1 {
+            path: dependency.clone(),
+            sha256: format!("sha256:{:x}", Sha256::digest(b"qualified bytes")),
+        };
+        let config = AgCycleConfigV1 {
+            schema: AG_CYCLE_CONFIG_SCHEMA_V1.into(),
+            store: PathBuf::from("relative.sqlite"),
+            present_evidence_resolver: pin(),
+            nq_program: pin(),
+            nq_config: pin(),
+            nq_source_id: "source".into(),
+            ag_loopctl: pin(),
+            ag_database: directory.path().join("ag.sqlite"),
+            ag_observation_resolver: pin(),
+            ag_observation_resolver_id: "resolver".into(),
+            ag_runtime_profile: directory.path().join("runtime-profile.json"),
+            shared_admission_requirement_digest: format!("sha256:{}", "b".repeat(64)),
+            recover_observed_at: "2026-09-12T00:00:00Z".into(),
+        };
+        assert!(config
+            .into_run_arguments(directory.path().join("request.json"))
+            .is_err());
+    }
+
+    #[test]
     fn attention_replay_selects_exactly_one_input_contract() {
         assert!(Arguments::try_parse_from([
             "nightshift",
@@ -1621,5 +2129,48 @@ mod exact_input_tests {
             "--bundle-stdin"
         ])
         .is_err());
+    }
+
+    #[test]
+    fn shared_config_and_saved_check_command_surfaces_coexist() {
+        for verb in ["run-config", "recover-config"] {
+            assert!(Arguments::try_parse_from([
+                "nightshift",
+                "cycle",
+                verb,
+                "--config",
+                "/not-opened/config.json",
+                "--request",
+                "/not-opened/request.json",
+            ])
+            .is_ok());
+            assert!(Arguments::try_parse_from([
+                "nightshift",
+                "cycle",
+                verb,
+                "--config",
+                "/not-opened/config.json",
+            ])
+            .is_err());
+        }
+        assert!(Arguments::try_parse_from([
+            "nightshift",
+            "saved-check",
+            "schedule",
+            "--policy",
+            "/not-opened/policy.json",
+            "--scheduler-clock-id",
+            "qualified-owner-clock",
+            "--at",
+            "2026-09-14T00:00:00Z",
+        ])
+        .is_ok());
+        assert!(Arguments::try_parse_from([
+            "nightshift",
+            "saved-check",
+            "attention-replay",
+            "--bundle-stdin",
+        ])
+        .is_ok());
     }
 }
