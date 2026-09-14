@@ -47,6 +47,9 @@ use nightshiftd::reservation_qualification::{
     NqNgReservationVerifierV1, ReservationApplicabilityProfileV1, ReservationRealizationStoreV1,
 };
 use nightshiftd::saved_check_recurrence::SavedCheckScheduleV1;
+use nightshiftd::saved_check_runtime::{
+    read_config as read_saved_check_config, SavedCheckRuntimeV1,
+};
 use nightshiftd::steady_state_evidence::{
     SteadyStateEvidenceProfileV1, SteadyStateObservationHandoffV1, SteadyStateObservationVerifierV1,
 };
@@ -120,6 +123,22 @@ enum SavedCheckCommand {
         scheduler_clock_id: String,
         #[arg(long)]
         at: String,
+    },
+    /// Acquire and evaluate one due slot, or reconcile its retained identity.
+    Run {
+        #[arg(long)]
+        runtime_config: PathBuf,
+        #[arg(long)]
+        policy: PathBuf,
+        #[arg(long)]
+        scheduler_clock_id: String,
+        #[arg(long)]
+        at: String,
+    },
+    /// Inspect one retained evaluation without acquiring or reading its source.
+    Inspect {
+        #[arg(long)]
+        evaluation_id: String,
     },
 }
 
@@ -558,11 +577,11 @@ fn main() -> anyhow::Result<()> {
             run_reservation_qualification_command(&arguments.store, command)
         }
         Command::Packet { command } => run_packet_command(command),
-        Command::SavedCheck { command } => run_saved_check_command(command),
+        Command::SavedCheck { command } => run_saved_check_command(&arguments.store, command),
     }
 }
 
-fn run_saved_check_command(command: SavedCheckCommand) -> anyhow::Result<()> {
+fn run_saved_check_command(store_path: &Path, command: SavedCheckCommand) -> anyhow::Result<()> {
     match command {
         SavedCheckCommand::Schedule {
             policy,
@@ -574,6 +593,36 @@ fn run_saved_check_command(command: SavedCheckCommand) -> anyhow::Result<()> {
                 .select(&scheduler_clock_id, parse_time(&at)?)
                 .map_err(anyhow::Error::msg)?;
             write_exact(&selection)
+        }
+        SavedCheckCommand::Run {
+            runtime_config,
+            policy,
+            scheduler_clock_id,
+            at,
+        } => {
+            let (config, config_digest) =
+                read_saved_check_config(&runtime_config).map_err(anyhow::Error::msg)?;
+            let policy: SavedCheckScheduleV1 = read_exact_canonical(&policy)?;
+            let mut runtime = SavedCheckRuntimeV1::open(store_path).map_err(anyhow::Error::msg)?;
+            let result = runtime
+                .run(
+                    &config,
+                    &config_digest,
+                    &policy,
+                    &scheduler_clock_id,
+                    parse_time(&at)?,
+                )
+                .map_err(anyhow::Error::msg)?;
+            write_exact(&result)
+        }
+        SavedCheckCommand::Inspect { evaluation_id } => {
+            let runtime =
+                SavedCheckRuntimeV1::open_read_only(store_path).map_err(anyhow::Error::msg)?;
+            let result = runtime
+                .inspect(&evaluation_id)
+                .map_err(anyhow::Error::msg)?
+                .context("saved-check evaluation is not retained")?;
+            write_exact(&result)
         }
     }
 }

@@ -51,3 +51,41 @@ the explicit outcome/currentness/maintenance policy. No automatic runner,
 attention submission, notification, generation pruning, or production-service
 installation is supplied by this command. These missing connections remain
 integration work, not guarantees inferred from a successful selection.
+
+## Durable local evaluation owner
+
+`nightshift saved-check run` is the bounded saved-check-specific continuation
+from a due slot. Its closed JCS runtime config pins the Monitor and NQ
+executables and NQ config, fixes one local Monitor project/trusted root,
+project/producer/manifest/concern identity, one operator-selected SQLite target,
+the installed NQ definition identity, and one condition mapping. Monitor
+producer execution is explicitly enrolled with `--allow-exec` and remains
+constrained by Monitor's own bounds; it is not described as read-only merely
+because the later NQ query is read-only.
+
+The command durably opens one evaluation before collection, retains the exact
+Monitor inventory and selected concern's `observation.observed_at`, and keeps
+the separate acquisition time. It then verifies NQ's installed definition and
+persists the complete NQ read binding before the one allowed evaluation. On
+response loss, a later invocation asks NQ for that exact evaluation result. A
+retained claim or missing result after launch remains indeterminate; Nightshift
+does not repeat Monitor collection or the NQ source read automatically.
+
+The configured relationship between the Monitor observation and saved-check
+target is an operator deployment assumption. It is neither proof that the
+inventory describes the SQLite bytes nor an atomic snapshot. After result
+custody, Nightshift records one trusted projection coordinate and uses it for
+the retained NQ condition. It never substitutes the earlier slot-selection
+time or refreshes that coordinate during replay. The projection keeps original
+outcome, source-assertion currentness and maintenance state separate. It does
+not refresh evidence or grant authority. NQ's SQLite query has explicit row,
+byte, progress and lock bounds, but those are not a universal hard
+filesystem-I/O deadline.
+
+```sh
+nightshift --store /absolute/nightshift.sqlite saved-check run \
+  --runtime-config /absolute/runtime-config.json \
+  --policy /absolute/policy.json --scheduler-clock-id CLOCK --at RFC3339
+nightshift --store /absolute/nightshift.sqlite saved-check inspect \
+  --evaluation-id sha256:...
+```
