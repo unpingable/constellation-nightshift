@@ -118,18 +118,22 @@ fn raw_completion_echo_tuple_and_installed_adapter_are_exact() {
     request
         .validate_dispatch_graph(&profile, &requirement, &dispatch(&request, &requirement))
         .unwrap();
-    assert_eq!(request.adapter_executable_identity, RUNNER);
+    assert_eq!(requirement.adapter_executable_identity, RUNNER);
+    assert_eq!(
+        profile.adapters["switchyard-codex"].executable_identity,
+        RUNNER
+    );
     assert_eq!(request.adapter_protocol, "switchyard.codex-app-server/v2");
     assert_eq!(request.adapter_version, "2.0.0");
     assert_eq!(request.timeout_seconds, 120);
     assert_eq!(request.maximum_output_bytes, 32768);
     assert_eq!(request.internal_provider_retry_count, 0);
     assert!(!request.semantic_retry);
-    let mut mixed = request.clone();
+    let mut mixed = requirement.clone();
     mixed.adapter_executable_identity = digest('e');
     mixed.seal().unwrap();
-    assert!(mixed
-        .validate_dispatch_graph(&profile, &requirement, &dispatch(&mixed, &requirement))
+    assert!(request
+        .validate_dispatch_graph(&profile, &mixed, &dispatch(&request, &mixed))
         .is_err());
 }
 
