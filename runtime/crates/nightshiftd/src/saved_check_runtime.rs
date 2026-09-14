@@ -588,6 +588,10 @@ impl SavedCheckRuntimeV1 {
 struct Output {
     success: bool,
     stdout: Vec<u8>,
+    // Production retains no child diagnostics in this projection. Tests keep
+    // the bytes solely to prove that the separately bounded stderr file is
+    // drained after child exit rather than coupled to stdout parsing.
+    #[cfg(test)]
     stderr: Vec<u8>,
 }
 
@@ -660,10 +664,14 @@ fn run_bounded(
     };
     kill_process_group(child.id());
     // Enforce the same limit after the final write/exit transition.
+    #[cfg(test)]
     let stderr = read_file(stderr, MAX_RESULT_BYTES)?;
+    #[cfg(not(test))]
+    read_file(stderr, MAX_RESULT_BYTES)?;
     Ok(Output {
         success: status.success(),
         stdout: read_file(stdout, MAX_RESULT_BYTES)?,
+        #[cfg(test)]
         stderr,
     })
 }
