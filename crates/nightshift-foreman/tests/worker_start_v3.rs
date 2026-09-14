@@ -19,6 +19,7 @@ type V3Substitution = Box<dyn Fn(&mut WorkerStartRequestV3)>;
 
 #[test]
 fn explicit_beta_owner_tuple_preserves_requirement_binding_without_fallback() {
+    check_candidate_tuple(ProviderAdmissionOwnerPinsV1::filtered_raw_completion_echo_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::raw_completion_echo_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::bounded_turn_echo_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::prior_bounded_turn_echo_candidate());
@@ -45,6 +46,27 @@ fn explicit_beta_owner_tuple_preserves_requirement_binding_without_fallback() {
     hybrid.switchyard_schema_sha256 =
         ProviderAdmissionOwnerPinsV1::beta_candidate().switchyard_schema_sha256;
     assert!(hybrid.validate().is_err());
+}
+
+#[test]
+fn filtered_raw_completion_successor_preserves_old_tuple_and_exact_schema() {
+    let filtered = ProviderAdmissionOwnerPinsV1::filtered_raw_completion_echo_candidate();
+    assert_eq!(
+        filtered.switchyard_owner_head,
+        "299609cda100ccf8701d5619ac78499f8bddd303"
+    );
+    let prior = ProviderAdmissionOwnerPinsV1::raw_completion_echo_candidate();
+    assert_eq!(
+        prior.switchyard_owner_head,
+        "df9acbd044beaa4cb165dcb648341cc373aecd72"
+    );
+    let mut same_protocol = filtered.clone();
+    same_protocol.switchyard_owner_head = prior.switchyard_owner_head.clone();
+    assert_eq!(same_protocol, prior);
+    let mut mixed = filtered;
+    mixed.switchyard_schema_sha256 =
+        ProviderAdmissionOwnerPinsV1::prior_bounded_turn_echo_candidate().switchyard_schema_sha256;
+    assert!(mixed.validate().is_err());
 }
 
 #[test]
