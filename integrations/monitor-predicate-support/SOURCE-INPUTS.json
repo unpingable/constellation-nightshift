@@ -1,0 +1,96 @@
+{
+  "canonical_component": "constellation-monitor",
+  "canonical_revision": "d741ca74171bcf4ffec910e124aa17f24173dbb7",
+  "generated": [
+    "Cargo.toml",
+    "Cargo.lock",
+    ".gitignore",
+    "LICENSE",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "layout_substitutions": [],
+  "schema": "constellation.monitor_predicate_source_inputs/v1",
+  "source_inputs": {
+    "crates/monitor-project-concerns/Cargo.toml": {
+      "byte_length": 365,
+      "sha256": "153cc1e38642a04e56718ee4b7c4fad3053c2ab611246954a8848705de8e3390"
+    },
+    "crates/monitor-project-concerns/src/lib.rs": {
+      "byte_length": 27736,
+      "sha256": "62ac7437a3293b264e241da6e18870771ce7e4ae01994f7f63dcc6e239fc88c8"
+    },
+    "crates/monitor-project-concerns/src/main.rs": {
+      "byte_length": 5936,
+      "sha256": "3d2b08a89a74f1e1ec40c36c201110084b9d7ba53d39554bb30a63ec566a11ed"
+    },
+    "crates/monitor-project-concerns/tests/contract.rs": {
+      "byte_length": 15193,
+      "sha256": "2724f4eef3765ca727a4af2ca59829484db327343740f2bf41bf0323631e04cd"
+    },
+    "crates/monitor-project-concerns/tests/fixtures/fourth-project/.ops/concerns.toml": {
+      "byte_length": 738,
+      "sha256": "2666d40f567d9977248aa1749d0a4bb8d20863931eca3c4676f7ec97e95698db"
+    },
+    "crates/monitor-project-concerns/tests/fixtures/fourth-project/.ops/observation.toml": {
+      "byte_length": 233,
+      "sha256": "516fc13868339666982cc1b8cc78be526aa0b02a3c3d51f0378c1bc007f95650"
+    },
+    "crates/monitor-project-concerns/tests/fixtures/fourth-project/producer.py": {
+      "byte_length": 1978,
+      "sha256": "0e3b10afe6a7223f57498022cf14b1955c88bf312dd0147636fde6568631eeaf"
+    },
+    "crates/pulse-project-predicate-support/Cargo.toml": {
+      "byte_length": 440,
+      "sha256": "0c69f506791369f4e6623969705af25b036d3738c89c8cf94de49c695767dfbf"
+    },
+    "crates/pulse-project-predicate-support/src/lib.rs": {
+      "byte_length": 32515,
+      "sha256": "8ef82cd8623befff099c693e766d631fed8515f5d21c4a20c0d3fdcb651a84fe"
+    },
+    "crates/pulse-project-predicate-support/src/main.rs": {
+      "byte_length": 3371,
+      "sha256": "777c081dcfa84d280ec313f6dd2e7387f571b95a8abb21705f49e4870f07c3ca"
+    },
+    "crates/pulse-project-predicate-support/tests/qualification.rs": {
+      "byte_length": 18536,
+      "sha256": "17389087924e0a28f9e93a1b35812777c543ae0460434b3a93fc1868d5574a39"
+    },
+    "docs/local-queue-attention.md": {
+      "byte_length": 7659,
+      "sha256": "eee425bfe6e3d7bb80d3ba91c707a934b446fc12ac824c1aca6a1ea07051d2f7"
+    },
+    "examples/local-queue-attention.py": {
+      "byte_length": 18721,
+      "sha256": "37f0b88b5c60807b7091276b68b078f15b56c73adeb8e661e5c3fbcc1a687593"
+    },
+    "schemas/monitor.project-observation.inventory.v1.schema.json": {
+      "byte_length": 2062,
+      "sha256": "f0fe89621fc9647e1962816c74f2109517758948ba4655f2f6b7dd2bdb81bf4c"
+    },
+    "schemas/project.concerns.v1.schema.json": {
+      "byte_length": 948,
+      "sha256": "3e9d496e3d44a4ac2260136a8eeb544a0ca931ad53ce1661eee936f1b28fffd2"
+    },
+    "schemas/project.observation-binding.v1.schema.json": {
+      "byte_length": 671,
+      "sha256": "e92d50d312042aab1124daaa2fc77dd8f528f520c5274d9fceed23830e9aea7c"
+    },
+    "schemas/project.ops.status.v1.schema.json": {
+      "byte_length": 2344,
+      "sha256": "fad038b31250049b15b6f45a7a4568b73baf2ecd030b020cf676e4f942de09c3"
+    },
+    "schemas/pulse.project-predicate-qualified-support.v1.schema.json": {
+      "byte_length": 2593,
+      "sha256": "3226feff3afb9358f354d55ecb8566dfaf33d8d3dfe66358b695319c14d78a49"
+    },
+    "schemas/pulse.project-predicate-support-evidence.v1.schema.json": {
+      "byte_length": 1340,
+      "sha256": "7d9338dd163f186cf765cac9b58940020f4ec551ef881ba0c61ebca716be72f8"
+    },
+    "schemas/pulse.project-predicate-support-policy.v1.schema.json": {
+      "byte_length": 2281,
+      "sha256": "36e61ff02b16a3e7338a377c60a31f8812e5001504be44102baa9729ecac88d4"
+    }
+  }
+}
