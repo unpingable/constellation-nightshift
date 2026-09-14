@@ -22,10 +22,10 @@ use crate::authoring_custody::{
     VerifiedMaudeHandoffV1,
 };
 use crate::canonical_store::{
-    AgProgramCounterV1, AttentionClassV1, AttentionRecordV1, CanonicalStore, CanonicalStoreError,
-    CycleStatusV1, ObservationCycleId, ObservationCycleV1, ObservationFamilyKeyV1,
-    ObservationOrderKeyV1, ObservationRecordV1, RecurrenceSlotV1, SlotTimingV1, TemporalDecisionV1,
-    TemporalPostureV1, TypedCoarseIntentV2,
+    AgProfileBindingV1, AgProgramCounterV1, AttentionClassV1, AttentionRecordV1, CanonicalStore,
+    CanonicalStoreError, CycleStatusV1, ObservationCycleId, ObservationCycleV1,
+    ObservationFamilyKeyV1, ObservationOrderKeyV1, ObservationRecordV1, RecurrenceSlotV1,
+    SlotTimingV1, TemporalDecisionV1, TemporalPostureV1, TypedCoarseIntentV2,
 };
 use crate::currentness::{
     delivered_artifact_ids, PresentEvidencePortV1, PresentEvidenceQueryV1, SupportStandingV1,
@@ -268,11 +268,92 @@ pub struct CanonicalCycleRequestV1 {
     pub temporal_policy: Option<TemporalPolicyRequestV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proposal: Option<PrecompiledWorkflowProposalV2>,
+    /// Optional V2 shared-admission material. Historical V1 request bytes
+    /// omit this field unchanged; protected V2 config ingress requires it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewed_plan_binding: Option<ReviewedPlanBindingTransportV1>,
     /// Optional exact authoring context presented at the real proposal
     /// handoff. It is lineage input only and is not sent to AG or consulted by
     /// any currentness, standing, admissibility, or authorization gate.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authoring_context: Option<MaudeAuthoringContextHandoffV1>,
+}
+
+pub const REVIEWED_PLAN_BINDING_TRANSPORT_SCHEMA_V1: &str =
+    "nightshift.reviewed-plan-binding-transport/v1";
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewedPlanBindingTransportV1 {
+    pub schema: String,
+    pub binding_sha256: String,
+    pub binding_base64: String,
+}
+
+impl ReviewedPlanBindingTransportV1 {
+    pub fn bytes(&self) -> Result<Vec<u8>, String> {
+        if self.schema != REVIEWED_PLAN_BINDING_TRANSPORT_SCHEMA_V1 {
+            return Err("unsupported reviewed plan-binding transport schema".into());
+        }
+        require_digest("binding_sha256", &self.binding_sha256)?;
+        let bytes = decode_base64_strict(&self.binding_base64)?;
+        if bytes.is_empty() || bytes.len() > 16 * 1024 * 1024 {
+            return Err("reviewed plan binding must be between 1 byte and 16 MiB".into());
+        }
+        if self.binding_sha256 != format!("sha256:{:x}", Sha256::digest(&bytes)) {
+            return Err("reviewed plan binding digest mismatch".into());
+        }
+        let value: serde_json::Value = serde_json::from_slice(&bytes)
+            .map_err(|_| "reviewed plan binding is not JSON".to_owned())?;
+        if value.get("schema").and_then(serde_json::Value::as_str)
+            != Some("maude.governed-plan-binding/v1")
+        {
+            return Err("reviewed plan binding has an unsupported schema".into());
+        }
+        if serde_jcs::to_vec(&value).map_err(|error| error.to_string())? != bytes {
+            return Err("reviewed plan binding must use exact canonical JSON bytes".into());
+        }
+        Ok(bytes)
+    }
+}
+
+fn decode_base64_strict(value: &str) -> Result<Vec<u8>, String> {
+    if value.is_empty() || value.len() % 4 != 0 {
+        return Err("reviewed plan binding must use padded standard base64".into());
+    }
+    let mut output = Vec::with_capacity(value.len() / 4 * 3);
+    for (index, group) in value.as_bytes().chunks_exact(4).enumerate() {
+        let final_group = index + 1 == value.len() / 4;
+        let decode = |byte: u8| -> Result<u8, String> {
+            match byte {
+                b'A'..=b'Z' => Ok(byte - b'A'),
+                b'a'..=b'z' => Ok(byte - b'a' + 26),
+                b'0'..=b'9' => Ok(byte - b'0' + 52),
+                b'+' => Ok(62),
+                b'/' => Ok(63),
+                _ => Err("reviewed plan binding has invalid base64".into()),
+            }
+        };
+        let padding = group.iter().rev().take_while(|&&byte| byte == b'=').count();
+        if padding > 2 || (!final_group && padding != 0) || group[..4 - padding].contains(&b'=') {
+            return Err("reviewed plan binding has non-canonical base64 padding".into());
+        }
+        let a = decode(group[0])?;
+        let b = decode(group[1])?;
+        let c = if padding >= 2 { 0 } else { decode(group[2])? };
+        let d = if padding >= 1 { 0 } else { decode(group[3])? };
+        if (padding == 2 && b & 0x0f != 0) || (padding == 1 && c & 0x03 != 0) {
+            return Err("reviewed plan binding has non-canonical base64 trailing bits".into());
+        }
+        output.push((a << 2) | (b >> 4));
+        if padding < 2 {
+            output.push((b << 4) | (c >> 2));
+        }
+        if padding == 0 {
+            output.push((c << 6) | d);
+        }
+    }
+    Ok(output)
 }
 
 impl CanonicalCycleRequestV1 {
@@ -337,6 +418,9 @@ impl CanonicalCycleRequestV1 {
         }
         if let Some(proposal) = &self.proposal {
             proposal.validate()?;
+        }
+        if let Some(binding) = &self.reviewed_plan_binding {
+            binding.bytes()?;
         }
         if let Some(authoring_context) = &self.authoring_context {
             authoring_context.validate_untrusted()?;
@@ -642,7 +726,20 @@ where
         &mut self,
         request: CanonicalCycleRequestV1,
     ) -> Result<CycleRunOutcomeV1, CanonicalRuntimeError> {
-        self.run_cycle_inner(request, None)
+        self.run_cycle_inner(request, None, None)
+    }
+
+    /// Closed-config ingress for a V2 AG deployment relation. The binding is
+    /// retained with the prepared request before AG is contacted.
+    pub fn run_cycle_with_ag_profile_binding(
+        &mut self,
+        request: CanonicalCycleRequestV1,
+        binding: AgProfileBindingV1,
+    ) -> Result<CycleRunOutcomeV1, CanonicalRuntimeError> {
+        binding
+            .validate()
+            .map_err(|error| CanonicalRuntimeError::Invalid(error.to_string()))?;
+        self.run_cycle_inner(request, None, Some(binding))
     }
 
     /// Production authoring-context ingress. Authentication occurs before NQ
@@ -668,7 +765,7 @@ where
                     .verify(handoff, &expected)
                     .map_err(CanonicalRuntimeError::Invalid)
             })?;
-        self.run_cycle_inner(request, Some(verified))
+        self.run_cycle_inner(request, Some(verified), None)
     }
 
     fn compose_external_evidence(
@@ -903,8 +1000,24 @@ where
         &mut self,
         request: CanonicalCycleRequestV1,
         verified_handoff: Option<VerifiedMaudeHandoffV1>,
+        mut ag_profile_binding: Option<AgProfileBindingV1>,
     ) -> Result<CycleRunOutcomeV1, CanonicalRuntimeError> {
         request.validate().map_err(CanonicalRuntimeError::Invalid)?;
+        // Preserve the complete, already-validated sealed request before any
+        // legacy branch consumes one of its optional fields.
+        let source_cycle_request = serde_json::to_value(&request)
+            .map_err(|error| CanonicalRuntimeError::Invalid(error.to_string()))?;
+        let reviewed_plan_binding = request
+            .reviewed_plan_binding
+            .as_ref()
+            .map(ReviewedPlanBindingTransportV1::bytes)
+            .transpose()
+            .map_err(CanonicalRuntimeError::Invalid)?;
+        if ag_profile_binding.is_some() && reviewed_plan_binding.is_none() {
+            return Err(CanonicalRuntimeError::Invalid(
+                "protected V2 config ingress requires a sealed reviewed plan binding".into(),
+            ));
+        }
         match (&request.authoring_context, &verified_handoff) {
             (None, None) => {}
             (Some(_), Some(_)) => {}
@@ -1090,7 +1203,14 @@ where
             })
             .transpose()
             .map_err(CanonicalRuntimeError::Invalid)?;
-        let prepared = ag_request.prepared()?;
+        if let Some(binding) = &mut ag_profile_binding {
+            binding.runtime_profile_digest = self
+                .ag
+                .runtime_profile_digest()
+                .map_err(CanonicalRuntimeError::Ag)?;
+            binding.validate_prepared()?;
+        }
+        let prepared = ag_request.prepared(&source_cycle_request, ag_profile_binding)?;
         let pending = self.store.prepare_ag_occurrence(
             &lease,
             &recorded.state_digest,
@@ -1102,7 +1222,10 @@ where
             },
             request.evaluated_at,
         )?;
-        let ag = match self.ag.open_occurrence(&ag_request) {
+        let ag = match self
+            .ag
+            .open_occurrence_with_plan_binding(&ag_request, reviewed_plan_binding.as_deref())
+        {
             Ok(value) => value,
             Err(error) => {
                 let _ = self.store.mark_recovery_required(
@@ -1510,6 +1633,7 @@ mod tests {
                 }),
             }),
             authoring_context: None,
+            reviewed_plan_binding: None,
         }
         .seal()
         .unwrap()
@@ -1641,6 +1765,8 @@ mod tests {
         status_attempt: Option<String>,
         status_settlement: Option<String>,
         request: Option<AgOpenOccurrenceRequestV1>,
+        reviewed_plan_binding: Option<Vec<u8>>,
+        runtime_profile_digest: Option<String>,
     }
 
     impl Default for FakeAg {
@@ -1652,6 +1778,8 @@ mod tests {
                 status_attempt: None,
                 status_settlement: None,
                 request: None,
+                reviewed_plan_binding: None,
+                runtime_profile_digest: None,
             }
         }
     }
@@ -1722,6 +1850,19 @@ mod tests {
                 reference.settlement_id = Some(settlement.clone());
             }
             Ok(reference)
+        }
+
+        fn open_occurrence_with_plan_binding(
+            &mut self,
+            request: &AgOpenOccurrenceRequestV1,
+            binding: Option<&[u8]>,
+        ) -> Result<AgOccurrenceReferenceV1, String> {
+            self.reviewed_plan_binding = binding.map(ToOwned::to_owned);
+            self.open_occurrence(request)
+        }
+
+        fn runtime_profile_digest(&mut self) -> Result<Option<String>, String> {
+            Ok(self.runtime_profile_digest.clone())
         }
     }
 
@@ -1924,6 +2065,57 @@ mod tests {
             handoff.observation.attempt_id,
             handoff.observation.settlement_id,
         )
+    }
+
+    #[test]
+    fn config_bound_cycle_retains_verified_profile_and_exact_sealed_request() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut store = CanonicalStore::open(directory.path().join("ns.sqlite")).unwrap();
+        let binding_bytes = br#"{"schema":"maude.governed-plan-binding/v1"}"#.to_vec();
+        let mut request = cycle_request(0, true);
+        request.reviewed_plan_binding = Some(ReviewedPlanBindingTransportV1 {
+            schema: REVIEWED_PLAN_BINDING_TRANSPORT_SCHEMA_V1.into(),
+            binding_sha256: format!("sha256:{:x}", Sha256::digest(&binding_bytes)),
+            binding_base64: "eyJzY2hlbWEiOiJtYXVkZS5nb3Zlcm5lZC1wbGFuLWJpbmRpbmcvdjEifQ==".into(),
+        });
+        let request = request.seal().unwrap();
+        let expected_request = serde_json::to_value(&request).unwrap();
+        let expected_request_digest = digest_value(&expected_request).unwrap();
+        let profile_digest = digest('e');
+        let mut support = CurrentSupportPort::default();
+        let mut ag = FakeAg {
+            runtime_profile_digest: Some(profile_digest.clone()),
+            ..FakeAg::default()
+        };
+        let outcome = CanonicalRuntime::new(&mut store, TestNqAdmissionPort, &mut support, &mut ag)
+            .run_cycle_with_ag_profile_binding(
+                request.clone(),
+                AgProfileBindingV1 {
+                    runtime_profile_digest: None,
+                    shared_admission_requirement_digest: digest('f'),
+                },
+            )
+            .unwrap();
+        let CycleRunOutcomeV1::AgOccurrenceOpened { cycle } = outcome else {
+            panic!("config-bound request must open its exact AG occurrence");
+        };
+        let prepared = cycle.prepared_ag_request.unwrap();
+        assert_eq!(
+            prepared.source_cycle_request_id.as_deref(),
+            Some(request.request_id.as_str())
+        );
+        assert_eq!(
+            prepared.source_cycle_request_digest.as_deref(),
+            Some(expected_request_digest.as_str())
+        );
+        assert_eq!(
+            prepared.ag_profile_binding,
+            Some(AgProfileBindingV1 {
+                runtime_profile_digest: Some(profile_digest),
+                shared_admission_requirement_digest: digest('f'),
+            })
+        );
+        assert_eq!(ag.reviewed_plan_binding, Some(binding_bytes));
     }
 
     #[test]

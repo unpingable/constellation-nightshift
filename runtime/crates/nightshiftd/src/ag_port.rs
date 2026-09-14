@@ -12,9 +12,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 
 use crate::canonical_store::{
-    AgOccurrenceReferenceV1, AgProgramCounterV1, AgRefusalReferenceV1, CanonicalStoreError,
-    ObservationRecordV1, PreparedAgRequestV1, TypedCoarseIntentV2, AG_REFERENCE_SCHEMA_V1,
-    AG_REFUSAL_SCHEMA_V1, PREPARED_AG_REQUEST_SCHEMA_V1,
+    AgOccurrenceReferenceV1, AgProfileBindingV1, AgProgramCounterV1, AgRefusalReferenceV1,
+    CanonicalStoreError, ObservationRecordV1, PreparedAgRequestV1, TypedCoarseIntentV2,
+    AG_REFERENCE_SCHEMA_V1, AG_REFUSAL_SCHEMA_V1, PREPARED_AG_REQUEST_SCHEMA_V1,
 };
 
 pub const AG_OPEN_REQUEST_SCHEMA_V1: &str = "nightshift.ag_open_occurrence_request.v1";
@@ -263,8 +263,40 @@ impl AgOpenOccurrenceRequestV1 {
         Ok(())
     }
 
-    pub fn prepared(&self) -> Result<PreparedAgRequestV1, CanonicalStoreError> {
+    pub fn prepared(
+        &self,
+        source_cycle_request: &serde_json::Value,
+        ag_profile_binding: Option<AgProfileBindingV1>,
+    ) -> Result<PreparedAgRequestV1, CanonicalStoreError> {
         self.validate().map_err(CanonicalStoreError::Invalid)?;
+        let mut source_preimage = source_cycle_request.clone();
+        let source = source_preimage.as_object_mut().ok_or_else(|| {
+            CanonicalStoreError::Invalid("source cycle request must be an object".into())
+        })?;
+        if source.get("schema").and_then(serde_json::Value::as_str)
+            != Some("nightshift.canonical_cycle_request.v1")
+        {
+            return Err(CanonicalStoreError::Invalid(
+                "unsupported source cycle request schema".into(),
+            ));
+        }
+        let source_cycle_request_id = source
+            .remove("request_id")
+            .and_then(|value| value.as_str().map(str::to_owned))
+            .ok_or_else(|| {
+                CanonicalStoreError::Invalid("source cycle request lacks request_id".into())
+            })?;
+        let expected_id = digest_value(&source_preimage).map_err(CanonicalStoreError::Invalid)?;
+        if source_cycle_request_id != expected_id {
+            return Err(CanonicalStoreError::Invalid(
+                "source cycle request identity mismatch".into(),
+            ));
+        }
+        let source_cycle_request_digest =
+            digest_value(source_cycle_request).map_err(CanonicalStoreError::Invalid)?;
+        if let Some(binding) = &ag_profile_binding {
+            binding.validate()?;
+        }
         let exact_request = serde_json::to_value(self)?;
         Ok(PreparedAgRequestV1 {
             schema: PREPARED_AG_REQUEST_SCHEMA_V1.into(),
@@ -272,6 +304,9 @@ impl AgOpenOccurrenceRequestV1 {
             campaign_id: self.campaign_id.clone(),
             occurrence_id: self.occurrence_id.clone(),
             source_intent_id: self.source_intent_id.clone(),
+            source_cycle_request_id: Some(source_cycle_request_id),
+            source_cycle_request_digest: Some(source_cycle_request_digest),
+            ag_profile_binding,
             exact_request,
         })
     }
@@ -283,11 +318,29 @@ pub trait AgOccurrencePortV1 {
         request: &AgOpenOccurrenceRequestV1,
     ) -> Result<AgOccurrenceReferenceV1, String>;
 
+    fn open_occurrence_with_plan_binding(
+        &mut self,
+        request: &AgOpenOccurrenceRequestV1,
+        binding: Option<&[u8]>,
+    ) -> Result<AgOccurrenceReferenceV1, String> {
+        if binding.is_some() {
+            return Err("AG port does not support a sealed reviewed plan binding".into());
+        }
+        self.open_occurrence(request)
+    }
+
     fn status(
         &mut self,
         campaign_id: &str,
         occurrence_id: &str,
     ) -> Result<AgOccurrenceReferenceV1, String>;
+
+    /// The exact profile identity bound to AG's own reopened campaign store.
+    /// Generic ports do not necessarily expose it; closed config ingress
+    /// rejects an absent value rather than accepting a caller assertion.
+    fn runtime_profile_digest(&mut self) -> Result<Option<String>, String> {
+        Ok(None)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -361,6 +414,7 @@ impl AgLoopCtlPortV1 {
         command: &str,
         input: &serde_json::Value,
         include_observation_resolver: bool,
+        plan_binding: Option<&[u8]>,
     ) -> Result<serde_json::Value, String> {
         let mut file = tempfile::NamedTempFile::new()
             .map_err(|error| format!("AG exact-input tempfile failed: {error}"))?;
@@ -369,10 +423,19 @@ impl AgLoopCtlPortV1 {
             .map_err(|error| format!("AG exact-input write failed: {error}"))?;
         let database = self.database.to_string_lossy();
         let input_path = file.path().to_string_lossy();
+        let binding_file = plan_binding
+            .map(|bytes| {
+                let mut file = tempfile::NamedTempFile::new()
+                    .map_err(|error| format!("AG plan-binding tempfile failed: {error}"))?;
+                file.write_all(bytes)
+                    .map_err(|error| format!("AG plan-binding write failed: {error}"))?;
+                Ok::<_, String>(file)
+            })
+            .transpose()?;
         if include_observation_resolver {
             let resolver = self.observation_resolver.to_string_lossy();
             let resolver_id = &self.expected_observation_resolver_id;
-            self.run(&[
+            let mut arguments = vec![
                 command,
                 "--database",
                 &database,
@@ -382,7 +445,14 @@ impl AgLoopCtlPortV1 {
                 &resolver,
                 "--expected-observation-resolver-id",
                 resolver_id,
-            ])
+            ];
+            let binding_path = binding_file
+                .as_ref()
+                .map(|file| file.path().to_string_lossy());
+            if let Some(binding_path) = binding_path.as_ref() {
+                arguments.extend(["--plan-binding", binding_path.as_ref()]);
+            }
+            self.run(&arguments)
         } else if command == "init" {
             let profile = self.runtime_profile.to_string_lossy();
             self.run(&[
@@ -403,6 +473,28 @@ impl AgLoopCtlPortV1 {
         let database = self.database.to_string_lossy();
         self.run(&["status", "--database", &database])
     }
+
+    fn read_runtime_profile_digest(&self) -> Result<String, String> {
+        let database = self.database.to_string_lossy();
+        let stored = self.run(&["inspect", "--database", &database])?;
+        let stored_digest = stored
+            .get("runtime_profile")
+            .and_then(|value| value.get("digest"))
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "AG inspect has no genesis-bound runtime-profile digest".to_owned())?;
+        require_digest("AG stored runtime-profile digest", stored_digest)?;
+        let profile = self.runtime_profile.to_string_lossy();
+        let presented = self.run(&["verify-runtime-profile-v2", "--runtime-profile", &profile])?;
+        let presented_digest = presented
+            .get("profile_digest")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "AG runtime-profile verification has no profile digest".to_owned())?;
+        require_digest("AG presented runtime-profile digest", presented_digest)?;
+        if stored_digest != presented_digest {
+            return Err("configured runtime profile differs from AG genesis-bound profile".into());
+        }
+        Ok(stored_digest.to_owned())
+    }
 }
 
 impl AgOccurrencePortV1 for AgLoopCtlPortV1 {
@@ -418,19 +510,63 @@ impl AgOccurrencePortV1 for AgLoopCtlPortV1 {
             status
         } else {
             let value = match &request.mode {
-                AgOpenModeV1::Genesis { genesis } => self.run_with_input("init", genesis, false)?,
+                AgOpenModeV1::Genesis { genesis } => {
+                    self.run_with_input("init", genesis, false, None)?
+                }
                 AgOpenModeV1::Continuation { continuation } => {
-                    self.run_with_input("continue", continuation, false)?
+                    self.run_with_input("continue", continuation, false, None)?
                 }
             };
             parse_ag_snapshot(value, &request.campaign_id, &request.occurrence_id)?
         };
         if opened.program_counter == AgProgramCounterV1::ObservationRequired {
-            let value = self.run_with_input("record-proposal", &request.proposal_input, true)?;
+            let value =
+                self.run_with_input("record-proposal", &request.proposal_input, true, None)?;
             parse_ag_snapshot(value, &request.campaign_id, &request.occurrence_id)
         } else {
             Ok(opened)
         }
+    }
+
+    fn open_occurrence_with_plan_binding(
+        &mut self,
+        request: &AgOpenOccurrenceRequestV1,
+        binding: Option<&[u8]>,
+    ) -> Result<AgOccurrenceReferenceV1, String> {
+        let Some(binding) = binding else {
+            return self.open_occurrence(request);
+        };
+        request.validate()?;
+        let initial_status = self.read_status().ok().and_then(|value| {
+            parse_ag_snapshot(value, &request.campaign_id, &request.occurrence_id).ok()
+        });
+        let opened = if let Some(status) = initial_status {
+            status
+        } else {
+            let value = match &request.mode {
+                AgOpenModeV1::Genesis { genesis } => {
+                    self.run_with_input("init", genesis, false, None)?
+                }
+                AgOpenModeV1::Continuation { continuation } => {
+                    self.run_with_input("continue", continuation, false, None)?
+                }
+            };
+            parse_ag_snapshot(value, &request.campaign_id, &request.occurrence_id)?
+        };
+        if opened.program_counter != AgProgramCounterV1::ObservationRequired {
+            return Ok(opened);
+        }
+        let value = self.run_with_input(
+            "record-proposal",
+            &request.proposal_input,
+            true,
+            Some(binding),
+        )?;
+        parse_ag_snapshot(value, &request.campaign_id, &request.occurrence_id)
+    }
+
+    fn runtime_profile_digest(&mut self) -> Result<Option<String>, String> {
+        self.read_runtime_profile_digest().map(Some)
     }
 
     fn status(

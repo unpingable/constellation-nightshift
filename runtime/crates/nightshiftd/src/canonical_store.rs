@@ -1030,7 +1030,51 @@ pub struct PreparedAgRequestV1 {
     pub campaign_id: String,
     pub occurrence_id: String,
     pub source_intent_id: String,
+    /// Exact sealed Nightshift request that produced this AG request. Older
+    /// retained rows legitimately lack this field, but config recovery must
+    /// fail closed for them rather than guessing from campaign coordinates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_cycle_request_id: Option<String>,
+    /// Digest of the complete canonical sealed request bytes, including its
+    /// request_id. Config recovery compares this rather than trusting a
+    /// caller-repeated identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_cycle_request_digest: Option<String>,
+    /// V2 deployment relation carried only by closed-config ingress.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ag_profile_binding: Option<AgProfileBindingV1>,
     pub exact_request: serde_json::Value,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgProfileBindingV1 {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_profile_digest: Option<String>,
+    pub shared_admission_requirement_digest: String,
+}
+
+impl AgProfileBindingV1 {
+    pub fn validate(&self) -> Result<(), CanonicalStoreError> {
+        require_digest(
+            "shared_admission_requirement_digest",
+            &self.shared_admission_requirement_digest,
+        )?;
+        if let Some(profile) = &self.runtime_profile_digest {
+            require_digest("runtime_profile_digest", profile)?;
+        }
+        Ok(())
+    }
+
+    pub fn validate_prepared(&self) -> Result<(), CanonicalStoreError> {
+        self.validate()?;
+        if self.runtime_profile_digest.is_none() {
+            return Err(CanonicalStoreError::Invalid(
+                "prepared config request lacks genesis-bound runtime profile identity".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// Optional inert authoring lineage and its separately authenticated custody
@@ -1050,6 +1094,24 @@ impl PreparedAgRequestV1 {
         require_digest("request_digest", &self.request_digest)?;
         require_digest("campaign_id", &self.campaign_id)?;
         require_digest("source_intent_id", &self.source_intent_id)?;
+        match (
+            &self.source_cycle_request_id,
+            &self.source_cycle_request_digest,
+        ) {
+            (Some(request_id), Some(request_digest)) => {
+                require_digest("source_cycle_request_id", request_id)?;
+                require_digest("source_cycle_request_digest", request_digest)?;
+            }
+            (None, None) => {}
+            _ => {
+                return Err(CanonicalStoreError::Invalid(
+                    "prepared request has partial source-cycle identity".into(),
+                ))
+            }
+        }
+        if let Some(binding) = &self.ag_profile_binding {
+            binding.validate_prepared()?;
+        }
         uuid::Uuid::parse_str(&self.occurrence_id).map_err(|_| {
             CanonicalStoreError::Invalid(
                 "prepared AG occurrence_id must be an independently allocated UUID".into(),
