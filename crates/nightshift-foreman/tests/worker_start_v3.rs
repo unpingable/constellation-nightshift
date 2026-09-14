@@ -62,6 +62,15 @@ fn echo_owner_successor_and_prior_prelaunch_tuple_are_both_exact() {
         current.switchyard_schema_sha256,
         prior.switchyard_schema_sha256
     );
+    let earlier = ProviderAdmissionOwnerPinsV1::earlier_bounded_turn_echo_candidate();
+    assert_eq!(
+        earlier.switchyard_owner_head,
+        "ce5a3a0be8f90162581c820b85b2a785557aae24"
+    );
+    assert_eq!(
+        earlier.switchyard_schema_sha256,
+        prior.switchyard_schema_sha256
+    );
     assert_eq!(
         current.switchyard_schema_sha256,
         "sha256:c851fb5dd157ebb70896da06db50a07b968b3c0d357b2defc73ca267b9d82f93"

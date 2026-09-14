@@ -851,6 +851,7 @@ impl ProviderAdmissionOwnerPinsV1 {
         if self != &Self::accepted()
             && self != &Self::bounded_turn_echo_candidate()
             && self != &Self::prior_bounded_turn_echo_candidate()
+            && self != &Self::earlier_bounded_turn_echo_candidate()
             && self != &Self::bounded_turn_candidate()
             && self != &Self::beta_candidate()
             && self != &Self::prior_final_beta_candidate()
