@@ -1,16 +1,16 @@
 # Bounded turn echo custody candidate
 
 `ProviderAdmissionOwnerPinsV1::bounded_turn_echo_candidate()` selects Switchyard
-`6fe1084dc1a0e8e39a5a6c2bc108b39ace682724`, Codex
+`805e84d777eaab57c2108919ce43b09828e6e1ef`, Codex
 `97b0acd5ce2ccb3c87a763606696c35a450947f6`, and the vendored
-`switchyard.codex-provider-admission.bounded-turn-echo.v1.schema.json`
-(`sha256:2bcf795c753a08d3c7e2ef8b521b44b155054fccbd50452662230d59ddd3f293`).
+`switchyard.codex-provider-admission.bounded-turn-echo.v2.schema.json`
+(`sha256:c851fb5dd157ebb70896da06db50a07b968b3c0d357b2defc73ca267b9d82f93`).
 This is a separately enrolled `BOUNDED_TURN_ECHO_V1` capture context, not a
 replacement for historical `LEGACY_V1` or `BOUNDED_TURN_V1` tuples.
-The prior exact Switchyard tuple at
-`ce5a3a0be8f90162581c820b85b2a785557aae24` remains accepted only with the
-same echo schema digest so an already-retained prelaunch closure can be
-reconciled without rewriting its source identity.
+The exact `6fe1084dc1a0e8e39a5a6c2bc108b39ace682724` and
+`ce5a3a0be8f90162581c820b85b2a785557aae24` tuples remain explicit historical
+V1 selections with digest `sha256:2bcf795c753a08d3c7e2ef8b521b44b155054fccbd50452662230d59ddd3f293`;
+the new implementation never reinterprets those retained identities.
 
 The 256KiB raw bound applies only to the selected outbound `turn/start` request
 and exact source-shaped incoming user echoes, agent items/deltas, and final
