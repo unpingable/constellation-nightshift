@@ -35,12 +35,18 @@ substitution. The caller must close the stream and bound process duration.
 Replay checks retained consistency; notification delivery and evidence
 currentness remain separate checks.
 
+The separate [Monitor/Pulse source cut](../integrations/monitor-predicate-support/)
+and [local queue example](../integrations/monitor-predicate-support/docs/local-queue-attention.md)
+exercise actual acquisition, NQ admission, support and attention, ending in an
+intentional no-network delivery refusal. Select its own manifest when building
+those components. No private sibling dependency or live notification is implied.
+
 The repository-root workspace remains the predecessor command set. Its
 Diagnostics, Watchbill, Runs, NQ, Liveness, and agenda-keyed Attention commands
 are not aliases for `runtime/` and remain available from existing immutable
 revisions.
 
-## Public main: source build and inspection
+## Preserved predecessor: source build and inspection
 
 This branch is a source workspace, not an installed package. It requires Git,
 Rust 1.82 or newer, a native C compiler/linker for bundled SQLite, and public

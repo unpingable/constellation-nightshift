@@ -24,6 +24,12 @@ cargo test --locked --manifest-path runtime/Cargo.toml -p nightshiftd --bin nigh
 
 Workspace-wide and Casework tests require fixture inputs not distributed here.
 
+For Monitor/Pulse acquisition and support, select the independent manifest at
+`integrations/monitor-predicate-support/Cargo.toml` and its documented local
+queue example. Its source provenance and package tests are separate from the
+runtime workspace. Keep disposable state outside the product tree; no live
+notification or production-service action is authorized by an example.
+
 The root-level quick start below describes the preserved predecessor workspace,
 including Diagnostics, Watchbill, Runs, NQ, Liveness, and agenda-keyed Attention.
 Those commands are not aliases for `runtime/`.

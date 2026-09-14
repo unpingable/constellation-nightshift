@@ -8,7 +8,7 @@ Deferred agent work with receipts, reconciliation, and governed promotion.
 > Let agents work late without giving them the keys.
 
 
-## Two source workspaces
+## Choose a source workspace
 
 The additive [`runtime/`](runtime/) workspace is the source-pinned canonical
 cycle and Foreman runtime. Its exact inputs are recorded in
@@ -28,6 +28,13 @@ tool check an exact retained decision through a file or bounded standard input.
 It does not send a notification or refresh the underlying evidence.
 Workspace-wide and Casework test suites require fixture inputs not distributed
 in this source cut.
+
+For actual project acquisition and independent support, the additional
+[`integrations/monitor-predicate-support`](integrations/monitor-predicate-support/)
+source cut distributes the existing Monitor and Pulse components. Its
+[local queue caller](integrations/monitor-predicate-support/docs/local-queue-attention.md)
+connects them to public NQ and this runtime, including refusal and stale-state
+recovery checks. It does not send a live notification or authorize execution.
 
 The repository-root workspace is the predecessor command set documented below.
 Its Diagnostics, Watchbill, Runs, NQ, Liveness, and agenda-keyed Attention
