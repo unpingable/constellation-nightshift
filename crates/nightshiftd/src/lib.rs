@@ -26,6 +26,7 @@ pub mod packet;
 pub mod project_predicate_attention;
 pub mod repository_qualification;
 pub mod reservation_qualification;
+pub mod saved_check_attention;
 pub mod saved_check_recurrence;
 pub mod saved_check_runtime;
 pub mod steady_state_evidence;

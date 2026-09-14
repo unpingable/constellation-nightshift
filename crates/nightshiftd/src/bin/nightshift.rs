@@ -46,6 +46,11 @@ use nightshiftd::repository_qualification::{
 use nightshiftd::reservation_qualification::{
     NqNgReservationVerifierV1, ReservationApplicabilityProfileV1, ReservationRealizationStoreV1,
 };
+use nightshiftd::saved_check_attention::{
+    evaluate_saved_check_attention, read_bundle as read_saved_check_attention_bundle,
+    replay_saved_check_attention, SavedCheckAttentionPolicyV1, SavedCheckAttentionReplayBundleV1,
+    SavedCheckAttentionStoreV1,
+};
 use nightshiftd::saved_check_recurrence::SavedCheckScheduleV1;
 use nightshiftd::saved_check_runtime::{
     read_config as read_saved_check_config, SavedCheckRuntimeV1,
@@ -137,6 +142,27 @@ enum SavedCheckCommand {
     },
     /// Inspect one retained evaluation without acquiring or reading its source.
     Inspect {
+        #[arg(long)]
+        evaluation_id: String,
+    },
+    /// Project and retain attention from one terminal evaluation; sends nothing.
+    AttentionEvaluate {
+        #[arg(long)]
+        policy: PathBuf,
+        #[arg(long)]
+        evaluation_id: String,
+        #[arg(long)]
+        evaluated_at: String,
+    },
+    /// Recompute an exact saved-check attention bundle supplied on stdin.
+    AttentionReplay {
+        #[arg(long)]
+        bundle_stdin: bool,
+    },
+    /// Inspect a retained attention receipt without refreshing it.
+    AttentionStatus {
+        #[arg(long)]
+        policy: PathBuf,
         #[arg(long)]
         evaluation_id: String,
     },
@@ -623,6 +649,53 @@ fn run_saved_check_command(store_path: &Path, command: SavedCheckCommand) -> any
                 .map_err(anyhow::Error::msg)?
                 .context("saved-check evaluation is not retained")?;
             write_exact(&result)
+        }
+        SavedCheckCommand::AttentionEvaluate {
+            policy,
+            evaluation_id,
+            evaluated_at,
+        } => {
+            let policy: SavedCheckAttentionPolicyV1 = read_exact_canonical(&policy)?;
+            let runtime =
+                SavedCheckRuntimeV1::open_read_only(store_path).map_err(anyhow::Error::msg)?;
+            let evaluation = runtime
+                .inspect(&evaluation_id)
+                .map_err(anyhow::Error::msg)?
+                .context("saved-check evaluation is not retained")?;
+            let receipt =
+                evaluate_saved_check_attention(&policy, &evaluation, parse_time(&evaluated_at)?)
+                    .map_err(anyhow::Error::msg)?;
+            let mut store =
+                SavedCheckAttentionStoreV1::open(store_path).map_err(anyhow::Error::msg)?;
+            let receipt = store.retain(&receipt).map_err(anyhow::Error::msg)?;
+            write_exact(&SavedCheckAttentionReplayBundleV1 {
+                schema: nightshiftd::saved_check_attention::BUNDLE_SCHEMA.into(),
+                policy,
+                evaluation,
+                receipt,
+            })
+        }
+        SavedCheckCommand::AttentionReplay { bundle_stdin } => {
+            if !bundle_stdin {
+                bail!("saved-check attention replay requires --bundle-stdin");
+            }
+            let bundle = read_saved_check_attention_bundle(std::io::stdin().lock())
+                .map_err(anyhow::Error::msg)?;
+            write_exact(&replay_saved_check_attention(&bundle).map_err(anyhow::Error::msg)?)
+        }
+        SavedCheckCommand::AttentionStatus {
+            policy,
+            evaluation_id,
+        } => {
+            let policy: SavedCheckAttentionPolicyV1 = read_exact_canonical(&policy)?;
+            policy.validate().map_err(anyhow::Error::msg)?;
+            let store = SavedCheckAttentionStoreV1::open_read_only(store_path)
+                .map_err(anyhow::Error::msg)?;
+            let receipt = store
+                .inspect(&policy.policy_digest, &evaluation_id)
+                .map_err(anyhow::Error::msg)?
+                .context("saved-check attention receipt is not retained")?;
+            write_exact(&receipt)
         }
     }
 }

@@ -89,3 +89,40 @@ nightshift --store /absolute/nightshift.sqlite saved-check run \
 nightshift --store /absolute/nightshift.sqlite saved-check inspect \
   --evaluation-id sha256:...
 ```
+
+## Retained attention projection
+
+`saved-check attention-evaluate` projects attention only from one retained
+terminal evaluation. It does not rerun Monitor or NQ, refresh the source or
+send a notification. The policy is closed
+`nightshift.saved-check-attention-policy/v1` material with a self-digest and a
+1–300 second event-age bound. The operator-declared `--evaluated-at` is bound
+into the receipt; an exact duplicate returns the original receipt and cannot
+renew eligibility.
+
+```sh
+nightshift --store /absolute/nightshift.sqlite saved-check attention-evaluate \
+  --policy saved-check-attention-policy.json --evaluation-id EVALUATION \
+  --evaluated-at 2026-09-14T12:00:03Z
+nightshift --store /absolute/nightshift.sqlite saved-check attention-status \
+  --policy saved-check-attention-policy.json --evaluation-id EVALUATION
+nightshift saved-check attention-replay --bundle-stdin < replay-bundle.json
+```
+
+A failed saved check is `ATTENTION_REQUIRED`; active maintenance is retained as
+`SAVED_CHECK_FAILED_COVERED`, not converted to success or silently suppressed.
+Stale, future, refused, claimed, otherwise indeterminate, or maintenance-
+unavailable material is `LOSS_OF_ASSURANCE`. This asks for attention without
+claiming that a failed predicate is current. Delivery eligibility additionally
+requires the attention event coordinate to remain within the policy age bound;
+it is distinct from source currentness. `NO_ATTENTION` is reserved for an
+available, fresh `passed` result.
+
+The receipt and replay bundle carry `authority: none`. Nightshift retains and
+replays them but has no notification transport. A separate explicitly enrolled
+delivery owner may verify the exact replay bundle; that step neither grants
+action authority nor establishes human acknowledgement.
+
+Replay recomputes consistency of the operator-retained local evaluation and
+condition. It is not independent proof of a signed owner identity, the current
+source, or the truth of the caller-declared target relationship.
