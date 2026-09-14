@@ -293,7 +293,7 @@ impl SavedCheckRuntimeV1 {
         let request = selection.request.ok_or("saved-check slot is not due")?;
         let mut record = SavedCheckEvaluationV1 {
             schema: RECORD_SCHEMA.into(), evaluation_id: request.evaluation_id.clone(),
-            policy_digest: request.policy_digest.clone(), slot_id: request.slot.slot_id.clone(),
+            policy_digest: request.policy_digest.clone(), slot_id: request.slot.slot_id.as_str().to_owned(),
             config_digest: config_digest.into(), state: "selected".into(), projection_at: None, due_request: request,
             monitor_inventory: None, monitor_inventory_bytes_hex: None, monitor_inventory_sha256: None,
             acquisition_acquired_at_unix_ms: None, source_observed_at: None,
@@ -574,12 +574,12 @@ impl SavedCheckRuntimeV1 {
             if !self.transition("nq_started", &record)? {
                 return self
                     .inspect(&record.evaluation_id)?
-                    .ok_or("claimed evaluation disappeared");
+                    .ok_or_else(|| "claimed evaluation disappeared".to_owned());
             }
         } else if !self.transition(&prior, &record)? {
             return self
                 .inspect(&record.evaluation_id)?
-                .ok_or("claimed evaluation disappeared");
+                .ok_or_else(|| "claimed evaluation disappeared".to_owned());
         }
         Ok(record)
     }
@@ -588,6 +588,7 @@ impl SavedCheckRuntimeV1 {
 struct Output {
     success: bool,
     stdout: Vec<u8>,
+    stderr: Vec<u8>,
 }
 
 fn run_bounded(
@@ -627,29 +628,43 @@ fn run_bounded(
         .map_err(|e| format!("cannot start saved-check role: {e}"))?;
     let deadline = Instant::now() + Duration::from_secs(seconds);
     let status = loop {
-        if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
+        let status = match child.try_wait() {
+            Ok(status) => status,
+            Err(error) => {
+                stop_child_group(&mut child);
+                return Err(error.to_string());
+            }
+        };
+        if let Some(status) = status {
             break status;
         }
-        if stdout.metadata().map_err(|e| e.to_string())?.len() > MAX_RESULT_BYTES
-            || stderr.metadata().map_err(|e| e.to_string())?.len() > MAX_RESULT_BYTES
-        {
-            kill_process_group(child.id());
-            let _ = child.wait();
+        let output_lengths = stdout
+            .metadata()
+            .and_then(|out| stderr.metadata().map(|error| (out.len(), error.len())));
+        let (stdout_len, stderr_len) = match output_lengths {
+            Ok(lengths) => lengths,
+            Err(error) => {
+                stop_child_group(&mut child);
+                return Err(error.to_string());
+            }
+        };
+        if stdout_len > MAX_RESULT_BYTES || stderr_len > MAX_RESULT_BYTES {
+            stop_child_group(&mut child);
             return Err("saved-check role exceeded its output bound".into());
         }
         if Instant::now() >= deadline {
-            kill_process_group(child.id());
-            let _ = child.wait();
+            stop_child_group(&mut child);
             return Err("saved-check role exceeded its bounded runtime".into());
         }
         thread::sleep(Duration::from_millis(10));
     };
     kill_process_group(child.id());
     // Enforce the same limit after the final write/exit transition.
-    let _ = read_file(stderr, MAX_RESULT_BYTES)?;
+    let stderr = read_file(stderr, MAX_RESULT_BYTES)?;
     Ok(Output {
         success: status.success(),
         stdout: read_file(stdout, MAX_RESULT_BYTES)?,
+        stderr,
     })
 }
 
@@ -741,7 +756,7 @@ fn validate_record(record: &SavedCheckEvaluationV1) -> Result<(), String> {
     if record.schema != RECORD_SCHEMA
         || record.evaluation_id != record.due_request.evaluation_id
         || record.policy_digest != record.due_request.policy_digest
-        || record.slot_id != record.due_request.slot.slot_id
+        || record.slot_id != record.due_request.slot.slot_id.as_str()
         || record.authority != "none"
         || !matches!(
             record.state.as_str(),
@@ -867,7 +882,7 @@ fn bounded_read(path: &Path, max: u64) -> Result<Vec<u8>, String> {
     read_file(file, max)
 }
 fn read_file(mut file: File, max: u64) -> Result<Vec<u8>, String> {
-    use std::io::Read as _;
+    file.seek(SeekFrom::Start(0)).map_err(|e| e.to_string())?;
     let mut out = Vec::new();
     file.take(max + 1)
         .read_to_end(&mut out)
@@ -967,6 +982,11 @@ fn kill_process_group(pid: u32) {
         }
     }
 }
+
+fn stop_child_group(child: &mut std::process::Child) {
+    kill_process_group(child.id());
+    let _ = child.wait();
+}
 fn sha256(bytes: &[u8]) -> String {
     format!("sha256:{:x}", Sha256::digest(bytes))
 }
@@ -1065,7 +1085,7 @@ mod tests {
             schema: RECORD_SCHEMA.into(),
             evaluation_id: request.evaluation_id.clone(),
             policy_digest: request.policy_digest.clone(),
-            slot_id: request.slot.slot_id.clone(),
+            slot_id: request.slot.slot_id.as_str().to_owned(),
             config_digest: digest('3'),
             state: "selected".into(),
             projection_at: Some("2026-09-14T00:00:02Z".into()),
@@ -1181,6 +1201,24 @@ mod tests {
         let expected = sha256(&fs::read(&program).unwrap());
         assert!(run_bounded(&program, &expected, None, &[], 1).is_err());
         assert!(started.elapsed() < Duration::from_secs(3));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn bounded_role_rewinds_and_captures_both_output_files() {
+        let root = TempDir::new().unwrap();
+        let program = root.path().join("role");
+        fs::write(
+            &program,
+            b"#!/bin/sh\nprintf stdout-value\nprintf stderr-value >&2\n",
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o700)).unwrap();
+        let expected = sha256(&fs::read(&program).unwrap());
+        let output = run_bounded(&program, &expected, None, &[], 2).unwrap();
+        assert!(output.success);
+        assert_eq!(output.stdout, b"stdout-value");
+        assert_eq!(output.stderr, b"stderr-value");
     }
 
     #[cfg(target_os = "linux")]
