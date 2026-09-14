@@ -1,6 +1,6 @@
 {
   "canonical_component": "constellation-monitor",
-  "canonical_revision": "d741ca74171bcf4ffec910e124aa17f24173dbb7",
+  "canonical_revision": "53098ac14374191ccdd0aad78da1ee4dc2ad8d95",
   "generated": [
     "Cargo.toml",
     "Cargo.lock",
@@ -57,12 +57,12 @@
       "sha256": "17389087924e0a28f9e93a1b35812777c543ae0460434b3a93fc1868d5574a39"
     },
     "docs/local-queue-attention.md": {
-      "byte_length": 7659,
-      "sha256": "eee425bfe6e3d7bb80d3ba91c707a934b446fc12ac824c1aca6a1ea07051d2f7"
+      "byte_length": 8796,
+      "sha256": "ca68e2a8a1e0a6153a77ecc57926a7ec4b7e6fccf35967117941294d4e3c5f4e"
     },
     "examples/local-queue-attention.py": {
-      "byte_length": 18721,
-      "sha256": "37f0b88b5c60807b7091276b68b078f15b56c73adeb8e661e5c3fbcc1a687593"
+      "byte_length": 21165,
+      "sha256": "dd4a1a96ff445ace5491097e09d7c8319ab35e720ff024e0aa4c0c829f472d2b"
     },
     "schemas/monitor.project-observation.inventory.v1.schema.json": {
       "byte_length": 2062,

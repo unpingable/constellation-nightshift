@@ -4,7 +4,9 @@
 Linux, Python 3.10+, cryptography, and explicitly selected Monitor, NQ, Pulse and
 Nightshift executables are required. This is an external caller, not a scheduler.
 The queue is disposable; observations are real SQLite reads, not saved receipts.
-Network delivery is deliberately disabled. All records remain under --root.
+Network delivery is deliberately disabled by default. With `--local-inbox`, the
+same retained attention intent is delivered once to a disposable local file.
+All records remain under --root.
 """
 from __future__ import annotations
 
@@ -140,6 +142,8 @@ def main():
     parser.add_argument("--produce", type=Path)
     parser.add_argument("--support-observe", type=Path)
     parser.add_argument("--root", type=Path)
+    parser.add_argument("--local-inbox", action="store_true",
+        help="deliver the retained attention intent once to --root/local-inbox")
     for component in ("monitor", "nq", "pulse", "nightshift"):
         parser.add_argument("--" + component, type=Path)
     args = parser.parse_args()
@@ -158,6 +162,13 @@ def main():
             parser.error(f"--{component} must be an absolute executable path")
     root = args.root
     root.mkdir(mode=0o700)
+    inbox = root / "local-inbox"
+    if args.local_inbox:
+        # NQ opens this as a descriptor-bound runtime root. The enclosing
+        # example root remains operator-private; the inbox itself has NQ's
+        # required 0711 root mode and receives only generated 0600 files.
+        inbox.mkdir(mode=0o711)
+        inbox.chmod(0o711)
     project = root / "project"
     (project / ".ops").mkdir(parents=True, mode=0o700)
     database = project / "queue.sqlite"
@@ -276,17 +287,22 @@ description = "Is the observed queue depth at least eighteen?"
     stale_attention = json.loads((root / "stale-attention.json").read_bytes())
     require(stale_attention["receipt"]["disposition"] == "INPUT_NOT_CURRENT", "Stale input advanced attention")
     config = root / "nq.toml"
+    notification_route = f'''reference = "local-demo"
+transport = "local_file"
+local_inbox_directory = "{inbox}"
+timeout_ms = 10000
+max_response_bytes = 32768''' if args.local_inbox else '''reference = "local-demo"
+transport = "slack"
+endpoint_secret_locator = "NQ_LOCAL_DEMO_UNSET_URL"
+timeout_ms = 10000
+max_response_bytes = 32768'''
     config.write_text(f'''schema = "nq.config.v1"
 database_path = "{root / 'nq.sqlite'}"
 socket_path = "{root / 'nqd.sock'}"
 admissions_dir = "{root / 'admissions'}"
 helper_runtime_dir = "{root / 'helpers'}"
 [[notification_routes]]
-reference = "local-demo"
-transport = "slack"
-endpoint_secret_locator = "NQ_LOCAL_DEMO_UNSET_URL"
-timeout_ms = 10000
-max_response_bytes = 32768
+{notification_route}
 [notification_routes.nightshift_attention_replay]
 executable = "{args.nightshift}"
 executable_sha256 = "{file_digest(args.nightshift)}"
@@ -301,24 +317,43 @@ execution_account = "{pwd.getpwuid(os.getuid()).pw_name}"
         "stable_event_id": receipt["receipt_digest"], "attention_receipt_digest": receipt["receipt_digest"],
         "attention_policy_id": attention["policy_id"], "attention_policy_digest": attention["policy_digest"],
         "transition_id": receipt["receipt_digest"], "route_reference": "local-demo",
-        "destination_identity": "local-unconfigured-demo", "summary": "The disposable queue has twenty pending rows; inspect its records.",
+        "destination_identity": "local-inbox:local-demo" if args.local_inbox else "local-unconfigured-demo", "summary": "The disposable queue has twenty pending rows; inspect its records.",
         "inspection_reference": "local:attention.json", "owner_receipt": bundle}
     write(root / "intent.json", intent)
-    submit = [*nq, "notification", "submit", "--intent", root / "intent.json", "--route", "local-demo"]
-    delivered = invoke(root, "notification-no-network", submit)
-    require(delivered["delivery_state"] == "refused", "No-network submission did not refuse delivery")
-    require(invoke(root, "notification-duplicate", submit) == delivered, "Delivery duplicate diverged")
+    submit = [*nq, "notification", "deliver-local" if args.local_inbox else "submit",
+        "--intent", root / "intent.json", "--route", "local-demo"]
+    delivered = invoke(root, "notification-local-inbox" if args.local_inbox else "notification-no-network", submit)
+    if args.local_inbox:
+        require(delivered["delivery_state"] == "accepted", "Local inbox delivery did not accept its file")
+        require(delivered.get("human_receipt") == "not_established", "Local file must not claim human receipt")
+        duplicate_delivery = invoke(root, "notification-duplicate", submit)
+        require(duplicate_delivery["notification_id"] == delivered["notification_id"], "Local duplicate changed notification identity")
+        require(duplicate_delivery["delivery_state"] == "accepted", "Local duplicate changed delivery state")
+    else:
+        require(delivered["delivery_state"] == "refused", "No-network submission did not refuse delivery")
+        require(invoke(root, "notification-duplicate", submit) == delivered, "Delivery duplicate diverged")
     inspected = invoke(root, "notification-inspect", [*nq, "notification", "inspect", "--notification-id", delivered["notification_id"]])
-    require(inspected[0]["event_count"] == 1, "Duplicate created another delivery event")
+    require(inspected[0]["event_count"] == (2 if args.local_inbox else 1), "Duplicate created another delivery event")
+    if args.local_inbox:
+        messages = list(inbox.iterdir())
+        require(len(messages) == 1 and messages[0].is_file(), "Expected exactly one local inbox file")
+        require(messages[0].stat().st_mode & 0o777 == 0o600, "Local inbox message must be mode 0600")
+        require(messages[0].stat().st_size <= 4096, "Local inbox message exceeded its bounded contract")
+        message = json.loads(messages[0].read_bytes())
+        require(message["schema"] == "nq.local-inbox-message/v1", "Unexpected local inbox message schema")
+        require(message["delivery_statement"] == "local file retained; human receipt is not established",
+            "Local inbox message claimed human receipt")
     result = {"schema": "constellation.local-queue-attention-example/v1", "result": "qualified",
         "actual_components": ["Monitor", "NQ", "Pulse", "Nightshift"],
         "real_sqlite_reads": 2, "nightshift_duplicate_converged": True,
         "changed_catalog_refused": True, "stale_support_refused": True,
         "reopened_attention_does_not_refresh_evidence": True,
-        "notification_state": "refused", "network_enabled": False,
+        "notification_state": "accepted" if args.local_inbox else "refused", "network_enabled": False,
+        "local_inbox_enabled": args.local_inbox,
         "limitations": ["Disposable queue, not production state", "One operator supplies policy and both producer implementations",
             "Source-path independence only; not independent organizations or attested hardware",
-            "No recurring scheduler, maintenance overlay, live delivery or governed execution"],
+            "No recurring scheduler, maintenance overlay, live Slack/Discord delivery or governed execution",
+            "Local inbox delivery does not establish human receipt"],
         "executables": {name: file_digest(getattr(args, name)) for name in ("monitor", "nq", "pulse", "nightshift")}}
     write(root / "result.json", result)
     print(json.dumps(result, sort_keys=True))
