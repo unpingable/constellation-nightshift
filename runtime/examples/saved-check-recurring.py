@@ -2,9 +2,10 @@
 """Run a disposable Monitor -> Nightshift -> NQ saved-check recurrence.
 
 This is an explicit local operation, not an installed scheduler.  It keeps its
-records under an absent --root directory and performs no network, attention,
-notification, AG, or Docket operation.  The required --project-example is the
-public Monitor example used only as the bound observation producer.
+records under an absent --root directory and performs no network, AG, or Docket
+operation.  The optional --attention-inbox adds one local-file attention
+delivery; the required --project-example is the public Monitor example used
+only as the bound observation producer.
 """
 from __future__ import annotations
 
@@ -53,13 +54,22 @@ def require(value: bool, message: str) -> None:
         raise RuntimeError(message)
 
 
-def invoke(root: Path, transcript: Path, label: str, argv: list[str], expected: int = 0) -> object:
+def invoke(
+    root: Path,
+    transcript: Path,
+    label: str,
+    argv: list[str],
+    expected: int = 0,
+    stdin: bytes | None = None,
+) -> object:
     """Run one bounded local command; preserve enough output for recovery."""
+    if stdin is not None:
+        require(len(stdin) <= 32_768, "stdin contract exceeds 32 KiB")
     process = subprocess.Popen(
         argv,
         cwd=root,
         env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
-        stdin=subprocess.DEVNULL,
+        stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         start_new_session=True,
@@ -67,30 +77,63 @@ def invoke(root: Path, transcript: Path, label: str, argv: list[str], expected: 
     output = {"stdout": bytearray(), "stderr": bytearray()}
     deadline = time.monotonic() + 30
     failure: BaseException | None = None
+    group_cleaned = False
+
+    def clean_process_group() -> None:
+        nonlocal group_cleaned
+        if not group_cleaned:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            group_cleaned = True
+
     try:
+        pending = memoryview(stdin) if stdin is not None else None
+        if stdin is not None:
+            require(process.stdin is not None, "stdin pipe was not created")
+            os.set_blocking(process.stdin.fileno(), False)
         with selectors.DefaultSelector() as poll:
+            if pending is not None:
+                poll.register(process.stdin, selectors.EVENT_WRITE, "stdin")
             for name, pipe in (("stdout", process.stdout), ("stderr", process.stderr)):
                 poll.register(pipe, selectors.EVENT_READ, name)
             while poll.get_map():
                 if time.monotonic() >= deadline:
                     raise RuntimeError("command time limit exceeded; do not blindly restart")
                 for key, _ in poll.select(0.1):
-                    chunk = os.read(key.fileobj.fileno(), 8192)
-                    if not chunk:
-                        poll.unregister(key.fileobj)
-                    elif len(output[key.data]) + len(chunk) > MAX_OUTPUT:
-                        raise RuntimeError("command output exceeded 1 MiB")
+                    if key.data == "stdin":
+                        try:
+                            written = os.write(key.fileobj.fileno(), pending)
+                        except BlockingIOError:
+                            continue
+                        except BrokenPipeError as error:
+                            raise RuntimeError("command stopped accepting its bounded input") from error
+                        pending = pending[written:]
+                        if not pending:
+                            poll.unregister(key.fileobj)
+                            key.fileobj.close()
                     else:
-                        output[key.data].extend(chunk)
+                        chunk = os.read(key.fileobj.fileno(), 8192)
+                        if not chunk:
+                            poll.unregister(key.fileobj)
+                        elif len(output[key.data]) + len(chunk) > MAX_OUTPUT:
+                            raise RuntimeError("command output exceeded 1 MiB")
+                        else:
+                            output[key.data].extend(chunk)
+                if process.poll() is not None:
+                    # The leader can exit while a helper retains an inherited
+                    # descriptor. Clear the whole session before waiting for EOF.
+                    clean_process_group()
         process.wait(timeout=max(0.01, deadline - time.monotonic()))
+        clean_process_group()
     except BaseException as error:
         failure = error
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+        clean_process_group()
         process.wait()
     finally:
+        if process.stdin is not None and not process.stdin.closed:
+            process.stdin.close()
         process.stdout.close()
         process.stderr.close()
     record = {
@@ -130,6 +173,11 @@ def main() -> None:
     parser.add_argument("--nq", type=Path, required=True)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--project-example", type=Path, required=True)
+    parser.add_argument(
+        "--attention-inbox",
+        action="store_true",
+        help="also retain and deliver one attention receipt to a disposable local inbox",
+    )
     args = parser.parse_args()
     nightshift = require_file(parser, "nightshift", args.nightshift)
     monitor = require_file(parser, "monitor", args.monitor)
@@ -301,11 +349,139 @@ def main() -> None:
     require(next_run["evaluation_id"] != evaluation_id, "later slot reused evaluation identity")
     require(next_run["state"] == "terminal" and next_run["nq_result"]["outcome"] == "failed", "next slot did not evaluate its new source")
     require(next_run["source_observed_at"] != first["source_observed_at"] or next_run["monitor_inventory_sha256"] != first["monitor_inventory_sha256"], "next slot did not retain a distinct acquisition")
+    attention_result: dict[str, object] | None = None
+    if args.attention_inbox:
+        # This policy's digest is JCS over the same object with its digest blank.
+        # Its fields are ASCII strings and an integer, so this example's compact
+        # canonical encoder is the exact JCS representation for this object.
+        attention_policy = {
+            "schema": "nightshift.saved-check-attention-policy/v1",
+            "policy_id": "disposable-queue-attention",
+            "policy_digest": "",
+            "max_event_age_seconds": 300,
+        }
+        attention_policy["policy_digest"] = sha256_bytes(canonical(attention_policy))
+        attention_policy_path = root / "attention-policy.json"
+        write_json(attention_policy_path, attention_policy)
+        # This is the actual local decision clock. It does not modify the
+        # retained condition or source-observation coordinates.
+        evaluated_at = dt.datetime.now(dt.timezone.utc).isoformat(timespec="microseconds")
+        bundle = invoke(root, transcript, "saved-check-attention-evaluate", [
+            str(nightshift), "--store", str(root / "nightshift.sqlite"), "saved-check",
+            "attention-evaluate", "--policy", str(attention_policy_path),
+            "--evaluation-id", next_run["evaluation_id"], "--evaluated-at", evaluated_at,
+        ])
+        require(isinstance(bundle, dict), "attention evaluation did not return a bundle")
+        receipt = bundle.get("receipt")
+        require(isinstance(receipt, dict), "attention bundle lacks its receipt")
+        require(receipt.get("schema") == "nightshift.saved-check-attention-receipt/v1", "unexpected attention receipt schema")
+        require(receipt.get("disposition") == "ATTENTION_REQUIRED", "failed covered condition did not require attention")
+        require(receipt.get("delivery_eligible") is True, "fresh attention receipt was not delivery eligible")
+        require(receipt.get("authority") == "none", "attention receipt incorrectly grants authority")
+        require(receipt.get("inspection_reference") == f"saved-check:{next_run['evaluation_id']}", "attention receipt inspection reference is not exact")
+        bundle_bytes = canonical(bundle)
+        require(len(bundle_bytes) <= 32_768, "attention bundle exceeds NQ intent bound")
+        bundle_path = root / "attention-bundle.json"
+        with bundle_path.open("xb") as stream:
+            stream.write(bundle_bytes)
+        replay = invoke(root, transcript, "saved-check-attention-replay", [
+            str(nightshift), "--store", str(root / "nightshift.sqlite"), "saved-check",
+            "attention-replay", "--bundle-stdin",
+        ], stdin=bundle_bytes)
+        require(replay.get("schema") == "nightshift.saved-check-attention-replay/v1", "unexpected attention replay schema")
+        require(replay.get("matches") is True, "attention replay did not reproduce the exact receipt")
+        require(replay.get("expected_receipt_digest") == receipt["receipt_digest"], "attention replay changed receipt identity")
+        status = invoke(root, transcript, "saved-check-attention-status", [
+            str(nightshift), "--store", str(root / "nightshift.sqlite"), "saved-check",
+            "attention-status", "--policy", str(attention_policy_path),
+            "--evaluation-id", next_run["evaluation_id"],
+        ])
+        require(status == receipt, "attention status differs from the retained receipt")
+
+        inbox = root / "attention-inbox"
+        inbox.mkdir(mode=0o711)
+        inbox.chmod(0o711)
+        notification_config = root / "notification.toml"
+        notification_config.write_text(
+            "\n".join((
+                'schema = "nq.config.v1"', f'database_path = "{root / "nq.db"}"',
+                f'socket_path = "{root / "notification.sock"}"', f'admissions_dir = "{admissions}"',
+                f'helper_runtime_dir = "{helpers}"', "watchers = []", "",
+                "[[notification_routes]]", 'reference = "local-attention"',
+                'transport = "local_file"', f'local_inbox_directory = "{inbox}"',
+                "timeout_ms = 10000", "max_response_bytes = 1024", "",
+                "[notification_routes.nightshift_attention_replay]",
+                f'executable = "{nightshift}"', f'executable_sha256 = "{file_digest(nightshift)}"',
+                f'store_locator = "{root / "nightshift.sqlite"}"',
+                f'approved_policy_digest = "{attention_policy["policy_digest"]}"',
+                f'execution_account = "{os.getuid()}"', "",
+            )), encoding="utf-8",
+        )
+        receipt_digest = receipt.get("receipt_digest")
+        require(isinstance(receipt_digest, str), "attention receipt lacks its digest")
+        attention_intent = {
+            "schema": "nq.notification_delivery_intent.v1",
+            "attention_kind": "nightshift_receipt",
+            "stable_event_id": receipt_digest,
+            "attention_receipt_digest": receipt_digest,
+            "attention_policy_id": attention_policy["policy_id"],
+            "attention_policy_digest": attention_policy["policy_digest"],
+            "transition_id": receipt_digest,
+            "route_reference": "local-attention",
+            "destination_identity": "local-inbox:local-attention",
+            "summary": "Saved check needs attention; inspect the retained record.",
+            "inspection_reference": receipt["inspection_reference"],
+            "owner_receipt": bundle,
+        }
+        attention_intent_bytes = canonical(attention_intent)
+        require(len(attention_intent_bytes) <= 32_768, "attention intent exceeds NQ's 32 KiB bound")
+        attention_intent_path = root / "attention-intent.json"
+        with attention_intent_path.open("xb") as stream:
+            stream.write(attention_intent_bytes)
+        first_delivery = invoke(root, transcript, "attention-deliver-local", [
+            str(nq), "--config", str(notification_config), "--json", "notification",
+            "deliver-local", "--intent", str(attention_intent_path), "--route", "local-attention",
+        ])
+        require(first_delivery.get("delivery_state") == "accepted", "local attention delivery was not accepted")
+        notification_id = first_delivery.get("notification_id")
+        require(isinstance(notification_id, str), "local attention delivery lacks custody identity")
+        require(first_delivery.get("human_receipt") == "not_established", "local delivery must not claim human receipt")
+        files = list(inbox.iterdir())
+        require(len(files) == 1 and files[0].stat().st_mode & 0o777 == 0o600, "local inbox did not retain one private message")
+        duplicate_delivery = invoke(root, transcript, "attention-deliver-local-duplicate", [
+            str(nq), "--config", str(notification_config), "--json", "notification",
+            "deliver-local", "--intent", str(attention_intent_path), "--route", "local-attention",
+        ])
+        require(duplicate_delivery.get("notification_id") == notification_id, "duplicate changed delivery identity")
+        require(duplicate_delivery.get("delivery_state") == "accepted", "duplicate changed accepted custody")
+        require(len(list(inbox.iterdir())) == 1, "duplicate wrote a second local message")
+        delivery_status = invoke(root, transcript, "attention-delivery-inspect", [
+            str(nq), "--config", str(notification_config), "--json", "notification",
+            "inspect", "--notification-id", notification_id,
+        ])
+        require(len(delivery_status) == 1 and delivery_status[0].get("delivery_state") == "accepted", "delivery inspection disagrees with custody")
+        altered_bundle = json.loads(json.dumps(bundle))
+        altered_bundle["receipt"]["receipt_digest"] = "sha256:" + "0" * 64
+        altered_intent = dict(attention_intent)
+        altered_intent["owner_receipt"] = altered_bundle
+        altered_intent_path = root / "attention-altered-receipt-negative.json"
+        write_json(altered_intent_path, altered_intent)
+        invoke(root, transcript, "attention-altered-receipt-refusal-negative", [
+            str(nq), "--config", str(notification_config), "--json", "notification",
+            "deliver-local", "--intent", str(altered_intent_path), "--route", "local-attention",
+        ], expected=1)
+        require(len(list(inbox.iterdir())) == 1, "altered receipt created a local message")
+        attention_result = {
+            "receipt_digest": receipt_digest,
+            "notification_id": notification_id,
+            "delivery": "local_file_accepted_human_receipt_not_established",
+        }
     print(json.dumps({
         "result": "qualified", "scope": "disposable_monitor_nightshift_nq_saved_check",
         "root": str(root), "transcript": str(transcript), "first_evaluation_id": evaluation_id,
         "next_evaluation_id": next_run["evaluation_id"],
-        "limitations": ["no Pulse", "no automatic attention or notification", "no AG or Docket", "claimed/response-loss injection remains component qualification"],
+        "attention": attention_result,
+        "limitations": ["no Pulse", "no AG or Docket", "no HTTPS delivery or human acknowledgment", "claimed/response-loss injection remains component qualification"],
     }, sort_keys=True))
 
 
