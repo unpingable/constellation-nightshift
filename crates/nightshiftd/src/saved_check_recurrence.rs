@@ -30,9 +30,9 @@ pub struct SavedCheckScheduleV1 {
 
 /// Stable request shared by all selections of the same policy and slot.
 /// There is deliberately no source observation time or execution credential.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SavedCheckDueRequestV1 {
-    pub schema: &'static str,
+    pub schema: String,
     pub policy_digest: String,
     pub slot: RecurrenceSlotV1,
     pub evaluation_id: String,
@@ -169,7 +169,7 @@ impl SavedCheckScheduleV1 {
         }
         result.selection = Selection::Due;
         result.request = Some(SavedCheckDueRequestV1 {
-            schema: REQUEST_SCHEMA,
+            schema: REQUEST_SCHEMA.into(),
             policy_digest,
             evaluation_id: digest(&(REQUEST_SCHEMA, slot.slot_id.as_str()))?,
             slot,
