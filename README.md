@@ -15,9 +15,18 @@ cycle and Foreman runtime. Its exact inputs are recorded in
 [`runtime/SOURCE-PROVENANCE.json`](runtime/SOURCE-PROVENANCE.json); see the
 [`runtime` custody guide](runtime/docs/BOUNDED_PROVIDER_CUSTODY_V1.md).
 Build it with `cargo build --locked --manifest-path runtime/Cargo.toml`.
-The distributed test gate is only
-`cargo test --locked --manifest-path runtime/Cargo.toml -p nightshift-foreman`;
-workspace-wide and Casework test suites require fixture inputs not distributed
+The distributed focused test gates cover Foreman and attention replay:
+
+```sh
+cargo test --locked --manifest-path runtime/Cargo.toml -p nightshift-foreman
+cargo test --locked --manifest-path runtime/Cargo.toml -p nightshiftd --lib project_predicate_attention
+cargo test --locked --manifest-path runtime/Cargo.toml -p nightshiftd --bin nightshift exact_input_tests
+```
+
+[Attention replay](runtime/docs/ATTENTION-REPLAY-STDIN.md) lets an embedding
+tool check an exact retained decision through a file or bounded standard input.
+It does not send a notification or refresh the underlying evidence.
+Workspace-wide and Casework test suites require fixture inputs not distributed
 in this source cut.
 
 The repository-root workspace is the predecessor command set documented below.

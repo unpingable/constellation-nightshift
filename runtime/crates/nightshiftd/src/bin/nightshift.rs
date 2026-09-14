@@ -35,7 +35,8 @@ use nightshiftd::nq_admission::{
 };
 use nightshiftd::packet::NightshiftPacketV1;
 use nightshiftd::project_predicate_attention::{
-    evaluate, read_json as read_attention_json, replay_attention, verify_pulse_receipt,
+    evaluate, read_json as read_attention_json,
+    read_json_from_reader as read_attention_json_stream, replay_attention, verify_pulse_receipt,
     write_json as write_attention_json, AttentionPolicyV1, AttentionReplayBundleV1,
     AttentionStoreV1, PulseReplayInputsV1,
 };
@@ -148,8 +149,16 @@ enum AttentionCommand {
     /// Recompute an exact saved evaluation without reading or changing the
     /// store and without refreshing upstream time.
     Replay {
-        #[arg(long)]
-        bundle: PathBuf,
+        #[arg(
+            long,
+            required_unless_present = "bundle_stdin",
+            conflicts_with = "bundle_stdin"
+        )]
+        bundle: Option<PathBuf>,
+        /// Read the exact bounded replay bundle from stdin. This is intended
+        /// for callers that already retain and bind the input bytes.
+        #[arg(long, default_value_t = false, conflicts_with = "bundle")]
+        bundle_stdin: bool,
     },
     /// Concise read-only projection of an evaluation at an explicit
     /// occurrence. This does not append evidence.
@@ -678,9 +687,16 @@ fn run_attention_command(store_path: &Path, command: AttentionCommand) -> anyhow
                 write_exact(&bundle)
             }
         }
-        AttentionCommand::Replay { bundle } => {
-            let bundle: AttentionReplayBundleV1 =
-                read_attention_json(&bundle).map_err(anyhow::Error::msg)?;
+        AttentionCommand::Replay {
+            bundle,
+            bundle_stdin,
+        } => {
+            let bundle: AttentionReplayBundleV1 = match (bundle, bundle_stdin) {
+                (Some(path), false) => read_attention_json(&path).map_err(anyhow::Error::msg)?,
+                (None, true) => read_attention_json_stream(std::io::stdin().lock())
+                    .map_err(anyhow::Error::msg)?,
+                _ => bail!("attention replay requires exactly one of --bundle or --bundle-stdin"),
+            };
             let replay = replay_attention(&bundle).map_err(anyhow::Error::msg)?;
             write_exact(&replay)?;
             if !replay.matches {
@@ -1422,5 +1438,31 @@ mod exact_input_tests {
         std::fs::write(&path, br#"{"a":1,"b":2}"#).unwrap();
         let value: serde_json::Value = read_exact_canonical(&path).unwrap();
         assert_eq!(value, serde_json::json!({"a": 1, "b": 2}));
+    }
+
+    #[test]
+    fn attention_replay_selects_exactly_one_input_contract() {
+        assert!(Arguments::try_parse_from([
+            "nightshift",
+            "attention",
+            "replay",
+            "--bundle",
+            "/tmp/bundle.json"
+        ])
+        .is_ok());
+        assert!(
+            Arguments::try_parse_from(["nightshift", "attention", "replay", "--bundle-stdin"])
+                .is_ok()
+        );
+        assert!(Arguments::try_parse_from(["nightshift", "attention", "replay"]).is_err());
+        assert!(Arguments::try_parse_from([
+            "nightshift",
+            "attention",
+            "replay",
+            "--bundle",
+            "/tmp/bundle.json",
+            "--bundle-stdin"
+        ])
+        .is_err());
     }
 }

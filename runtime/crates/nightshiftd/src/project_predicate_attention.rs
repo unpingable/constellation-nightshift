@@ -9,7 +9,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{File, OpenOptions};
-use std::io::{Read as _, Write as _};
+use std::io::{Read, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
@@ -980,6 +980,27 @@ pub fn replay_attention(
 
 pub fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, String> {
     let bytes = read_bounded(path, MAX_INPUT_BYTES)?;
+    decode_exact_json(&bytes)
+}
+
+/// Read one exact bounded JSON value from an already-open stream.
+///
+/// This is the descriptor-bound caller contract: the caller owns how the
+/// bytes were retained and supplies them on stdin without converting a
+/// retained descriptor back into a pathname.
+pub fn read_json_from_reader<T: for<'de> Deserialize<'de>>(reader: impl Read) -> Result<T, String> {
+    let mut bytes = Vec::new();
+    reader
+        .take(MAX_INPUT_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
+    if bytes.len() as u64 > MAX_INPUT_BYTES {
+        return Err("stdin exceeds its byte bound".into());
+    }
+    decode_exact_json(&bytes)
+}
+
+fn decode_exact_json<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Result<T, String> {
     let mut deserializer = serde_json::Deserializer::from_slice(&bytes);
     let value = T::deserialize(&mut deserializer).map_err(|error| error.to_string())?;
     deserializer.end().map_err(|error| error.to_string())?;
@@ -1150,6 +1171,28 @@ mod tests {
 
     fn digest(byte: char) -> String {
         format!("sha256:{}", byte.to_string().repeat(64))
+    }
+
+    #[test]
+    fn bounded_stream_json_requires_one_exact_value() {
+        let value: serde_json::Value =
+            read_json_from_reader(std::io::Cursor::new(br#"{"ok":true}"#)).unwrap();
+        assert_eq!(value, serde_json::json!({"ok":true}));
+        assert!(
+            read_json_from_reader::<serde_json::Value>(std::io::Cursor::new(
+                br#"{"ok":true}{"extra":true}"#,
+            ))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn bounded_stream_json_refuses_oversize_input() {
+        let input = std::io::repeat(b'x').take(MAX_INPUT_BYTES + 1);
+        assert_eq!(
+            read_json_from_reader::<serde_json::Value>(input).unwrap_err(),
+            "stdin exceeds its byte bound"
+        );
     }
 
     fn policy(trigger: AttentionTriggerV1, count: u32) -> AttentionPolicyV1 {

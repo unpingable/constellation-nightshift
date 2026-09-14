@@ -14,10 +14,12 @@ Use [`runtime/SOURCE-PROVENANCE.json`](runtime/SOURCE-PROVENANCE.json) and the
 [`runtime` custody guide](runtime/docs/BOUNDED_PROVIDER_CUSTODY_V1.md) for the
 source-pinned canonical cycle and Foreman runtime. Build with
 `cargo build --locked --manifest-path runtime/Cargo.toml`. The distributed test
-gate is only:
+gates are:
 
 ```
 cargo test --locked --manifest-path runtime/Cargo.toml -p nightshift-foreman
+cargo test --locked --manifest-path runtime/Cargo.toml -p nightshiftd --lib project_predicate_attention
+cargo test --locked --manifest-path runtime/Cargo.toml -p nightshiftd --bin nightshift exact_input_tests
 ```
 
 Workspace-wide and Casework tests require fixture inputs not distributed here.

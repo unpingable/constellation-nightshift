@@ -16,15 +16,24 @@ The additive [`runtime/`](../runtime/) workspace contains the source-pinned
 canonical cycle and Foreman runtime. Its exact inputs are in
 [`SOURCE-PROVENANCE.json`](../runtime/SOURCE-PROVENANCE.json), with operational
 boundaries in the [custody guide](../runtime/docs/BOUNDED_PROVIDER_CUSTODY_V1.md).
-Build it with `cargo build --locked --manifest-path runtime/Cargo.toml`. The only
-distributed runtime test gate is:
+Build it with `cargo build --locked --manifest-path runtime/Cargo.toml`. The
+distributed focused runtime test gates are:
 
 ```sh
 cargo test --locked --manifest-path runtime/Cargo.toml -p nightshift-foreman
+cargo test --locked --manifest-path runtime/Cargo.toml -p nightshiftd --lib project_predicate_attention
+cargo test --locked --manifest-path runtime/Cargo.toml -p nightshiftd --bin nightshift exact_input_tests
 ```
 
 Workspace-wide and Casework tests require fixture inputs not distributed in
 this cut.
+
+For read-only decision verification from another process, use the
+[attention replay interface](../runtime/docs/ATTENTION-REPLAY-STDIN.md).
+It accepts an exact receipt bundle on standard input without pathname
+substitution. The caller must close the stream and bound process duration.
+Replay checks retained consistency; notification delivery and evidence
+currentness remain separate checks.
 
 The repository-root workspace remains the predecessor command set. Its
 Diagnostics, Watchbill, Runs, NQ, Liveness, and agenda-keyed Attention commands
