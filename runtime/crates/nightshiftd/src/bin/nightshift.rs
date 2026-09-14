@@ -1236,6 +1236,16 @@ fn run_cycle_command(store_path: &Path, command: CycleCommand) -> anyhow::Result
     run_cycle_command_bound(store_path, command, None)
 }
 
+// `PreparedAgRequestV1::exact_request` retains the sealed AG-open envelope.
+// The cycle proposal retains that envelope's exact inner proposal_input.  The
+// outer cycle-request digest and id are checked separately at recovery.
+fn prepared_open_request_matches_proposal_input(
+    prepared_open_request: &serde_json::Value,
+    proposal_input: &serde_json::Value,
+) -> bool {
+    prepared_open_request.get("proposal_input") == Some(proposal_input)
+}
+
 fn run_cycle_command_bound(
     store_path: &Path,
     command: CycleCommand,
@@ -1663,7 +1673,10 @@ fn run_cycle_command_bound(
                             && prepared.source_cycle_request_digest.as_deref()
                                 == Some(source_request_digest.as_str())
                             && prepared.ag_profile_binding.as_ref() == Some(&profile_binding)
-                            && prepared.exact_request == proposal.proposal_input
+                            && prepared_open_request_matches_proposal_input(
+                                &prepared.exact_request,
+                                &proposal.proposal_input,
+                            )
                     })
                 })
                 .collect::<Vec<_>>();
@@ -2129,6 +2142,37 @@ mod exact_input_tests {
             "--bundle-stdin"
         ])
         .is_err());
+    }
+
+    #[test]
+    fn recovery_matches_the_retained_open_envelope_inner_proposal_only() {
+        let proposal_input = serde_json::json!({
+            "class": "initial",
+            "observation": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "proposal": {"schema": "ag.governed-loop.exact-work-proposal/v1"}
+        });
+        let retained_open_envelope = serde_json::json!({
+            "schema": "nightshift.ag_open_occurrence_request.v1",
+            "request_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "campaign_id": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "occurrence_id": "8f67f8d1-a0e8-4a89-a664-2273304285b2",
+            "mode": {"genesis": {}},
+            "proposal_input": proposal_input.clone()
+        });
+        let altered_inner = serde_json::json!({"class": "successor"});
+        assert_ne!(retained_open_envelope, proposal_input);
+        assert!(prepared_open_request_matches_proposal_input(
+            &retained_open_envelope,
+            &proposal_input,
+        ));
+        assert!(!prepared_open_request_matches_proposal_input(
+            &retained_open_envelope,
+            &altered_inner,
+        ));
+        assert!(!prepared_open_request_matches_proposal_input(
+            &serde_json::json!({"proposal_input": null}),
+            &proposal_input,
+        ));
     }
 
     #[test]
