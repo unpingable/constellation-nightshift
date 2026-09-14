@@ -1,7 +1,7 @@
 # Bounded turn echo custody candidate
 
 `ProviderAdmissionOwnerPinsV1::bounded_turn_echo_candidate()` selects Switchyard
-`6d00e125e4d54191a8034e8e6f201396cffb2c92`, Codex
+`805e84d777eaab57c2108919ce43b09828e6e1ef`, Codex
 `97b0acd5ce2ccb3c87a763606696c35a450947f6`, and the vendored
 `switchyard.codex-provider-admission.bounded-turn-echo.v2.schema.json`
 (`sha256:c851fb5dd157ebb70896da06db50a07b968b3c0d357b2defc73ca267b9d82f93`).

@@ -52,7 +52,7 @@ fn echo_owner_successor_and_prior_prelaunch_tuple_are_both_exact() {
     let prior = ProviderAdmissionOwnerPinsV1::prior_bounded_turn_echo_candidate();
     assert_eq!(
         current.switchyard_owner_head,
-        "6d00e125e4d54191a8034e8e6f201396cffb2c92"
+        "805e84d777eaab57c2108919ce43b09828e6e1ef"
     );
     assert_eq!(
         prior.switchyard_owner_head,

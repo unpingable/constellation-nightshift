@@ -59,7 +59,7 @@ const PACKAGED_RUNTIME_SWITCHYARD_OWNER_HEAD: &str = "7df43b4e15cb1465f434e072b4
 // Independently frozen bounded-custody successor; selection needs new route approval.
 const BOUNDED_TURN_SWITCHYARD_OWNER_HEAD: &str = "8479cb77dc76632e64b66e84c4f75c9765e421a6";
 // Candidate only; finalized from the independently frozen Switchyard successor.
-const BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str = "6d00e125e4d54191a8034e8e6f201396cffb2c92";
+const BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str = "805e84d777eaab57c2108919ce43b09828e6e1ef";
 const PRIOR_BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str =
     "6fe1084dc1a0e8e39a5a6c2bc108b39ace682724";
 const EARLIER_BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str =
