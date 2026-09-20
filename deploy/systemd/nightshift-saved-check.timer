@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightshift bounded saved-check cadence
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=1s
+Unit=nightshift-saved-check.service
+Persistent=false
+
+[Install]
+WantedBy=timers.target

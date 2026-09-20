@@ -966,6 +966,25 @@ fn capture_sealed(
 }
 
 fn open_bounded_descriptor(path: &Path, max: u64, executable: bool) -> Result<File, String> {
+    #[cfg(target_os = "linux")]
+    let file = if let Some(raw) = inherited_proc_fd(path)? {
+        // Duplicate the already-open descriptor rather than reopening the
+        // diagnostic pathname. The caller must explicitly inherit this fd;
+        // ordinary filesystem inputs retain O_NOFOLLOW behavior below.
+        let duplicated = unsafe { libc::fcntl(raw, libc::F_DUPFD_CLOEXEC, 3) };
+        if duplicated < 0 {
+            return Err(std::io::Error::last_os_error().to_string());
+        }
+        // SAFETY: F_DUPFD_CLOEXEC returned a fresh owned descriptor.
+        unsafe { File::from_raw_fd(duplicated) }
+    } else {
+        fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+            .open(path)
+            .map_err(|e| e.to_string())?
+    };
+    #[cfg(not(target_os = "linux"))]
     let file = fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
@@ -979,6 +998,26 @@ fn open_bounded_descriptor(path: &Path, max: u64, executable: bool) -> Result<Fi
         return Err("saved-check enrolled program is not executable".into());
     }
     Ok(file)
+}
+
+#[cfg(target_os = "linux")]
+fn inherited_proc_fd(path: &Path) -> Result<Option<i32>, String> {
+    let Some(text) = path.to_str() else {
+        return Ok(None);
+    };
+    let Some(digits) = text.strip_prefix("/proc/self/fd/") else {
+        return Ok(None);
+    };
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err("inherited descriptor path is malformed".into());
+    }
+    let descriptor: i32 = digits
+        .parse()
+        .map_err(|_| "inherited descriptor is out of range")?;
+    if descriptor < 3 {
+        return Err("standard descriptors cannot carry saved-check input".into());
+    }
+    Ok(Some(descriptor))
 }
 
 fn kill_process_group(pid: u32) {
@@ -1244,6 +1283,22 @@ mod tests {
             .unwrap();
         assert!(output.status.success());
         assert_eq!(output.stdout, b"original");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn inherited_descriptor_input_is_duplicated_without_reopening_pathname() {
+        let root = TempDir::new().unwrap();
+        let config = root.path().join("config");
+        fs::write(&config, b"original").unwrap();
+        let retained = File::open(&config).unwrap();
+        let proc_path = PathBuf::from(format!("/proc/self/fd/{}", retained.as_raw_fd()));
+        fs::rename(&config, root.path().join("validated-config")).unwrap();
+        fs::write(&config, b"replacement").unwrap();
+        let duplicated = open_bounded_descriptor(&proc_path, 4096, false).unwrap();
+        assert_eq!(read_file(duplicated, 4096).unwrap(), b"original");
+        assert!(inherited_proc_fd(Path::new("/proc/self/fd/2")).is_err());
+        assert!(inherited_proc_fd(Path::new("/proc/self/fd/not-a-number")).is_err());
     }
 
     #[cfg(target_os = "linux")]

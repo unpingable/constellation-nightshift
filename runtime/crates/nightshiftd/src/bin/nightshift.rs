@@ -3,6 +3,8 @@
 
 use std::fs::OpenOptions;
 use std::io::{Read as _, Write as _};
+#[cfg(target_os = "linux")]
+use std::os::fd::FromRawFd as _;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context as _};
@@ -1895,16 +1897,37 @@ fn same_pinned_program_metadata(left: &std::fs::Metadata, right: &std::fs::Metad
 }
 
 fn read_exact_bytes(path: &Path) -> anyhow::Result<Vec<u8>> {
-    let mut options = OpenOptions::new();
-    options.read(true);
-    #[cfg(unix)]
-    {
+    #[cfg(target_os = "linux")]
+    let file = if let Some(raw) = exact_input_inherited_fd(path)? {
+        let duplicated = unsafe { libc::fcntl(raw, libc::F_DUPFD_CLOEXEC, 3) };
+        if duplicated < 0 {
+            return Err(std::io::Error::last_os_error())
+                .with_context(|| format!("duplicate exact input {}", path.display()));
+        }
+        // SAFETY: F_DUPFD_CLOEXEC returned a fresh owned descriptor.
+        unsafe { std::fs::File::from_raw_fd(duplicated) }
+    } else {
+        let mut options = OpenOptions::new();
+        options.read(true);
         use std::os::unix::fs::OpenOptionsExt as _;
         options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
-    }
-    let file = options
-        .open(path)
-        .with_context(|| format!("open exact input {}", path.display()))?;
+        options
+            .open(path)
+            .with_context(|| format!("open exact input {}", path.display()))?
+    };
+    #[cfg(not(target_os = "linux"))]
+    let file = {
+        let mut options = OpenOptions::new();
+        options.read(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt as _;
+            options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+        }
+        options
+            .open(path)
+            .with_context(|| format!("open exact input {}", path.display()))?
+    };
     let metadata = file
         .metadata()
         .with_context(|| format!("inspect exact input {}", path.display()))?;
@@ -1922,6 +1945,26 @@ fn read_exact_bytes(path: &Path) -> anyhow::Result<Vec<u8>> {
         bail!("exact input exceeds 16 MiB: {}", path.display());
     }
     Ok(bytes)
+}
+
+#[cfg(target_os = "linux")]
+fn exact_input_inherited_fd(path: &Path) -> anyhow::Result<Option<i32>> {
+    let Some(text) = path.to_str() else {
+        return Ok(None);
+    };
+    let Some(digits) = text.strip_prefix("/proc/self/fd/") else {
+        return Ok(None);
+    };
+    if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        bail!("inherited exact-input descriptor is malformed");
+    }
+    let descriptor: i32 = digits
+        .parse()
+        .context("inherited exact-input descriptor is out of range")?;
+    if descriptor < 3 {
+        bail!("standard descriptors cannot carry exact input");
+    }
+    Ok(Some(descriptor))
 }
 
 fn decode_exact<T: DeserializeOwned>(bytes: &[u8], path: &Path) -> anyhow::Result<T> {
@@ -1970,6 +2013,23 @@ fn parse_time(value: &str) -> anyhow::Result<DateTime<Utc>> {
 #[cfg(test)]
 mod exact_input_tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn exact_input_reads_inherited_descriptor_without_reopening_pathname() {
+        use std::os::fd::AsRawFd as _;
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("input.json");
+        std::fs::write(&path, br#"{"value":"original"}"#).unwrap();
+        let retained = std::fs::File::open(&path).unwrap();
+        let inherited = PathBuf::from(format!("/proc/self/fd/{}", retained.as_raw_fd()));
+        std::fs::rename(&path, directory.path().join("validated.json")).unwrap();
+        std::fs::write(&path, br#"{"value":"replacement"}"#).unwrap();
+        let value: serde_json::Value = read_exact(&inherited).unwrap();
+        assert_eq!(value["value"], "original");
+        assert!(exact_input_inherited_fd(Path::new("/proc/self/fd/2")).is_err());
+    }
 
     #[test]
     fn exact_input_preserves_crlf_and_rejects_trailing_json() {

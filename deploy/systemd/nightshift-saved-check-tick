@@ -1,0 +1,594 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+"""Run one bounded installed saved-check tick.
+
+Nightshift remains the durable evaluation and attention owner. NQ remains the
+saved-check and local-delivery owner. This supervisor supplies one wall-clock
+coordinate, overlap exclusion, pinned material, and restart-safe composition.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import fcntl
+import hashlib
+import json
+import os
+import selectors
+import signal
+import stat
+import subprocess
+import sys
+import time
+import tomllib
+from pathlib import Path
+
+PROFILE_SCHEMA = "nightshift.saved-check-installed-profile/v1"
+TICK_SCHEMA = "nightshift.saved-check-installed-tick/v1"
+RESULT_SCHEMA = "nightshift.saved-check-installed-result/v1"
+MAX_PROFILE = 64 * 1024
+MAX_MATERIAL = 1024 * 1024
+MAX_OUTPUT = 2 * 1024 * 1024
+
+
+def canonical(value: object) -> bytes:
+    return json.dumps(value, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode()
+
+
+def sha256(data: bytes) -> str:
+    return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def strict_json(data: bytes) -> dict:
+    def pairs(items):
+        value = {}
+        for key, item in items:
+            if key in value:
+                raise ValueError(f"duplicate JSON member: {key}")
+            value[key] = item
+        return value
+
+    def no_float(_value):
+        raise ValueError("floating-point JSON is unsupported")
+
+    value = json.loads(data.decode("ascii"), object_pairs_hook=pairs, parse_float=no_float)
+    if not isinstance(value, dict):
+        raise ValueError("expected one JSON object")
+    return value
+
+
+def read_regular(path: Path, limit: int) -> bytes:
+    if not path.is_absolute():
+        raise ValueError(f"path must be absolute: {path}")
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode) or before.st_size > limit:
+            raise ValueError(f"path is not a bounded regular file: {path}")
+        chunks = []
+        remaining = limit + 1
+        while remaining:
+            chunk = os.read(fd, min(64 * 1024, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        data = b"".join(chunks)
+        if len(data) > limit:
+            raise ValueError(f"path exceeds its byte bound: {path}")
+        after = os.fstat(fd)
+        named = os.stat(path, follow_symlinks=False)
+        opened_identity = (before.st_dev, before.st_ino)
+        if opened_identity != (named.st_dev, named.st_ino):
+            raise ValueError(f"pathname was replaced during read: {path}")
+        if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+            after.st_size, after.st_mtime_ns, after.st_ctime_ns
+        ):
+            raise ValueError(f"file content changed during read: {path}")
+        return data
+    finally:
+        os.close(fd)
+
+
+def no_symlink_components(path: Path, label: str) -> None:
+    if not path.is_absolute():
+        raise ValueError(f"{label} must be absolute")
+    current = Path(path.anchor)
+    for component in path.parts[1:]:
+        current /= component
+        if stat.S_ISLNK(os.lstat(current).st_mode):
+            raise ValueError(f"{label} ancestry contains a symlink: {current}")
+
+
+def owned_directory(path: Path, label: str) -> os.stat_result:
+    no_symlink_components(path, label)
+    details = os.stat(path, follow_symlinks=False)
+    if not stat.S_ISDIR(details.st_mode):
+        raise ValueError(f"{label} must be a directory")
+    if details.st_uid != os.geteuid():
+        raise ValueError(f"{label} must be owned by the service uid")
+    if details.st_mode & 0o022:
+        raise ValueError(f"{label} must not be group/world writable")
+    return details
+
+
+def require_digest(value: object, label: str) -> str:
+    if not isinstance(value, str) or len(value) != 71 or not value.startswith("sha256:"):
+        raise ValueError(f"{label} must be a lowercase SHA-256 identity")
+    if any(byte not in "0123456789abcdef" for byte in value[7:]):
+        raise ValueError(f"{label} must be a lowercase SHA-256 identity")
+    return value
+
+
+class PinnedFile:
+    def __init__(self, pathname: Path, fd: int, data: bytes) -> None:
+        self.pathname = pathname
+        self.fd = fd
+        self.data = data
+
+    @property
+    def proc_path(self) -> str:
+        return f"/proc/self/fd/{self.fd}"
+
+    def close(self) -> None:
+        if self.fd >= 0:
+            os.close(self.fd)
+            self.fd = -1
+
+
+def pinned(path_text: object, digest_text: object, label: str, limit: int = MAX_MATERIAL) -> PinnedFile:
+    if not isinstance(path_text, str):
+        raise ValueError(f"{label} path must be a string")
+    path = Path(path_text)
+    if not path.is_absolute():
+        raise ValueError(f"{label} path must be absolute")
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode) or before.st_size > limit:
+            raise ValueError(f"{label} is not a bounded regular file")
+        chunks = []
+        remaining = limit + 1
+        while remaining:
+            chunk = os.read(fd, min(64 * 1024, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        data = b"".join(chunks)
+        if len(data) > limit:
+            raise ValueError(f"{label} exceeds its byte bound")
+        after = os.fstat(fd)
+        named = os.stat(path, follow_symlinks=False)
+        if (before.st_dev, before.st_ino) != (named.st_dev, named.st_ino):
+            raise ValueError(f"{label} pathname was replaced during validation")
+        if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+            after.st_size, after.st_mtime_ns, after.st_ctime_ns
+        ):
+            raise ValueError(f"{label} changed during validation")
+        expected = require_digest(digest_text, f"{label}_sha256")
+        if sha256(data) != expected:
+            raise ValueError(f"{label} digest mismatch")
+        snapshot = os.memfd_create(label, os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING)
+        try:
+            os.fchmod(snapshot, stat.S_IMODE(before.st_mode))
+            written = 0
+            while written < len(data):
+                written += os.write(snapshot, data[written:])
+            os.lseek(snapshot, 0, os.SEEK_SET)
+            fcntl.fcntl(snapshot, fcntl.F_ADD_SEALS,
+                        fcntl.F_SEAL_SEAL | fcntl.F_SEAL_SHRINK |
+                        fcntl.F_SEAL_GROW | fcntl.F_SEAL_WRITE)
+        except BaseException:
+            os.close(snapshot)
+            raise
+        os.close(fd)
+        return PinnedFile(path, snapshot, data)
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def load_profile(path: Path) -> tuple[dict, str]:
+    data = read_regular(path, MAX_PROFILE)
+    value = strict_json(data.removesuffix(b"\n"))
+    if canonical(value) + b"\n" != data:
+        raise ValueError("profile must be canonical JSON plus newline")
+    expected = {
+        "schema", "nightshift_program", "nightshift_program_sha256", "nq_program",
+        "nq_program_sha256", "nightshift_store", "runtime_config",
+        "runtime_config_sha256", "schedule_policy", "schedule_policy_sha256",
+        "scheduler_clock_id", "attention_policy", "attention_policy_sha256",
+        "notification_config", "notification_config_sha256", "notification_route",
+        "notification_destination_identity", "state_directory", "command_timeout_seconds",
+    }
+    if set(value) != expected or value.get("schema") != PROFILE_SCHEMA:
+        raise ValueError("profile has an unsupported schema or field set")
+    for key in ("nightshift_store", "state_directory"):
+        item = value[key]
+        if not isinstance(item, str) or not Path(item).is_absolute():
+            raise ValueError(f"{key} must be absolute")
+    for key in ("scheduler_clock_id", "notification_route", "notification_destination_identity"):
+        item = value[key]
+        if not isinstance(item, str) or not item or len(item) > 256 or not item.isascii():
+            raise ValueError(f"{key} must be bounded nonempty ASCII")
+    if not value["notification_destination_identity"].startswith("local-inbox:"):
+        raise ValueError("notification destination must use local-inbox identity")
+    timeout = value["command_timeout_seconds"]
+    if not isinstance(timeout, int) or isinstance(timeout, bool) or not 1 <= timeout <= 60:
+        raise ValueError("command_timeout_seconds must be in 1..=60")
+    return value, sha256(data)
+
+
+def validate_material(profile: dict, state_path: Path) -> dict[str, PinnedFile]:
+    paths: dict[str, PinnedFile] = {}
+    try:
+        for key, path_key, digest_key, label, limit in (
+            ("nightshift", "nightshift_program", "nightshift_program_sha256", "nightshift_program", 1024**3),
+            ("nq", "nq_program", "nq_program_sha256", "nq_program", 1024**3),
+            ("runtime", "runtime_config", "runtime_config_sha256", "runtime_config", MAX_MATERIAL),
+            ("schedule", "schedule_policy", "schedule_policy_sha256", "schedule_policy", MAX_MATERIAL),
+            ("attention", "attention_policy", "attention_policy_sha256", "attention_policy", MAX_MATERIAL),
+            ("notification", "notification_config", "notification_config_sha256", "notification_config", MAX_MATERIAL),
+        ):
+            paths[key] = pinned(profile[path_key], profile[digest_key], label, limit)
+    except BaseException:
+        for item in paths.values():
+            item.close()
+        raise
+    try:
+        schedule = strict_json(paths["schedule"].data)
+        interval = schedule.get("interval_seconds")
+        epoch = schedule.get("epoch")
+        if (schedule.get("schema") != "nightshift.saved-check-schedule-policy/v1"
+                or schedule.get("scheduler_clock_id") != profile["scheduler_clock_id"]
+                or not isinstance(interval, int) or isinstance(interval, bool)
+                or not 60 <= interval <= 86_400 or interval % 60 != 0
+                or not isinstance(epoch, str)):
+            raise ValueError("installed schedule must use the enrolled clock and a whole-minute bounded interval")
+        parsed_epoch = parse_time(epoch)
+        if parsed_epoch.second != 0 or parsed_epoch.microsecond != 0:
+            raise ValueError("installed schedule epoch must align to a whole-minute boundary")
+        config = tomllib.loads(paths["notification"].data.decode("utf-8"))
+        routes = config.get("notification_routes")
+        if not isinstance(routes, list) or any(not isinstance(route, dict) for route in routes):
+            raise ValueError("notification config lacks a typed route list")
+        matches = [route for route in routes if route.get("reference") == profile["notification_route"]]
+        if len(routes) != 1 or len(matches) != 1 or matches[0].get("transport") != "local_file":
+            raise ValueError("notification config must contain exactly the selected local_file route")
+        inbox = matches[0].get("local_inbox_directory")
+        if not isinstance(inbox, str) or not Path(inbox).is_absolute():
+            raise ValueError("selected local_file route lacks an absolute inbox")
+        inbox_path = Path(os.path.abspath(inbox))
+        state_resolved = state_path.resolve(strict=True)
+        inbox_resolved = inbox_path.resolve(strict=True)
+        if not inbox_resolved.is_relative_to(state_resolved):
+            raise ValueError("local inbox must resolve below state_directory")
+        owned_directory(inbox_path, "local inbox")
+        return paths
+    except BaseException:
+        close_material(paths)
+        raise
+
+
+def close_material(paths: dict[str, PinnedFile]) -> None:
+    for item in paths.values():
+        item.close()
+
+
+def invoke(argv: list[str], timeout: int, stdin: bytes | None = None,
+           pass_fds: tuple[int, ...] = ()) -> dict:
+    # Passed descriptors share their open-file descriptions with the child.
+    # Restore every sealed snapshot to its start before each invocation so a
+    # prior parser cannot leave a later exact-input read at EOF.
+    for descriptor in pass_fds:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+    process = subprocess.Popen(
+        argv,
+        stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        pass_fds=pass_fds,
+        start_new_session=True,
+        bufsize=0,
+    )
+    assert process.stdout is not None and process.stderr is not None
+    streams = selectors.DefaultSelector()
+    output = {"stdout": bytearray(), "stderr": bytearray()}
+    deadline = time.monotonic() + timeout
+    input_view = memoryview(stdin or b"")
+    input_offset = 0
+    exceeded: str | None = None
+
+    def close_stream(stream) -> None:
+        try:
+            streams.unregister(stream)
+        except (KeyError, ValueError):
+            pass
+        stream.close()
+
+    def stop_and_reap() -> None:
+        # The child starts a new session so descendants cannot retain a pipe
+        # and make timeout/output-limit handling depend on their cooperation.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+
+    for stream, name in ((process.stdout, "stdout"), (process.stderr, "stderr")):
+        os.set_blocking(stream.fileno(), False)
+        streams.register(stream, selectors.EVENT_READ, name)
+    if process.stdin is not None:
+        os.set_blocking(process.stdin.fileno(), False)
+        if input_view:
+            streams.register(process.stdin, selectors.EVENT_WRITE, "stdin")
+        else:
+            process.stdin.close()
+
+    try:
+        while streams.get_map():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                stop_and_reap()
+                raise subprocess.TimeoutExpired(
+                    argv,
+                    timeout,
+                    output=bytes(output["stdout"]),
+                    stderr=bytes(output["stderr"]),
+                )
+            for key, _ in streams.select(remaining):
+                stream = key.fileobj
+                name = key.data
+                if name == "stdin":
+                    try:
+                        written = os.write(stream.fileno(), input_view[input_offset:])
+                    except BrokenPipeError:
+                        close_stream(stream)
+                    else:
+                        input_offset += written
+                        if input_offset == len(input_view):
+                            close_stream(stream)
+                    continue
+                try:
+                    chunk = os.read(stream.fileno(), 64 * 1024)
+                except BlockingIOError:
+                    continue
+                if not chunk:
+                    close_stream(stream)
+                    continue
+                available = MAX_OUTPUT - len(output[name])
+                if available:
+                    output[name].extend(chunk[:available])
+                if len(chunk) > available:
+                    exceeded = name
+                    break
+            if exceeded is not None:
+                break
+
+        if exceeded is not None:
+            stop_and_reap()
+            detail = bytes(output["stderr"])[-4096:].decode("utf-8", errors="replace").strip()
+            suffix = f"; stderr tail: {detail}" if detail else ""
+            raise RuntimeError(f"command {exceeded} exceeded 2 MiB{suffix}")
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            stop_and_reap()
+            raise subprocess.TimeoutExpired(
+                argv,
+                timeout,
+                output=bytes(output["stdout"]),
+                stderr=bytes(output["stderr"]),
+            )
+        try:
+            returncode = process.wait(timeout=remaining)
+        except subprocess.TimeoutExpired as error:
+            stop_and_reap()
+            raise subprocess.TimeoutExpired(
+                argv,
+                timeout,
+                output=bytes(output["stdout"]),
+                stderr=bytes(output["stderr"]),
+            ) from error
+    finally:
+        if process.poll() is None:
+            stop_and_reap()
+        streams.close()
+        for stream in (process.stdin, process.stdout, process.stderr):
+            if stream is not None and not stream.closed:
+                stream.close()
+
+    stdout = bytes(output["stdout"])
+    stderr = bytes(output["stderr"])
+    if returncode != 0:
+        detail = stderr.decode("utf-8", errors="replace")[-4096:].strip()
+        raise RuntimeError(f"command refused with exit {returncode}: {detail}")
+    return strict_json(stdout.rstrip(b"\n"))
+
+
+def write_once(path: Path, value: dict, *, newline: bool = True) -> dict:
+    data = canonical(value) + (b"\n" if newline else b"")
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC, 0o600)
+    except FileExistsError:
+        prior = strict_json(read_regular(path, MAX_OUTPUT).removesuffix(b"\n"))
+        if canonical(prior) + (b"\n" if newline else b"") != read_regular(path, MAX_OUTPUT):
+            raise ValueError(f"retained record is not canonical: {path}")
+        return prior
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(data)
+        stream.flush()
+        os.fsync(stream.fileno())
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+    return value
+
+
+def utc_now() -> str:
+    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def parse_time(value: str) -> dt.datetime:
+    return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def run(profile_path: Path, at: str | None = None) -> tuple[int, dict]:
+    profile, profile_digest = load_profile(profile_path)
+    state = Path(profile["state_directory"])
+    state_identity = owned_directory(state, "state_directory")
+    paths = validate_material(profile, state)
+    try:
+        return run_validated(profile, profile_digest, state, state_identity, paths, at)
+    finally:
+        close_material(paths)
+
+
+def run_validated(profile: dict, profile_digest: str, state: Path,
+                  state_identity: os.stat_result, paths: dict[str, PinnedFile],
+                  at: str | None) -> tuple[int, dict]:
+    material_fds = tuple(item.fd for item in paths.values())
+    lock_path = state / "tick.lock"
+    lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_CLOEXEC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(lock_fd, "a+b") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return 75, {"schema": RESULT_SCHEMA, "state": "overlap_refused", "authority": "none"}
+        return run_locked(profile, profile_digest, state, state_identity, paths,
+                          material_fds, at)
+
+
+def run_locked(profile: dict, profile_digest: str, state: Path,
+               state_identity: os.stat_result, paths: dict[str, PinnedFile],
+               material_fds: tuple[int, ...], at: str | None) -> tuple[int, dict]:
+    current_state = owned_directory(state, "state_directory")
+    if (state_identity.st_dev, state_identity.st_ino) != (
+        current_state.st_dev,
+        current_state.st_ino,
+    ):
+        raise ValueError("state_directory was replaced before tick custody")
+    ticks = state / "ticks"
+    ticks.mkdir(mode=0o700, exist_ok=True)
+    try:
+        owned_directory(ticks, "ticks directory")
+    except (OSError, ValueError):
+        raise
+    now = at or utc_now()
+    timeout = profile["command_timeout_seconds"]
+    common = [paths["nightshift"].proc_path, "--store", profile["nightshift_store"], "saved-check"]
+    selection = invoke(common + ["schedule", "--policy", paths["schedule"].proc_path,
+        "--scheduler-clock-id", profile["scheduler_clock_id"], "--at", now], timeout,
+        pass_fds=material_fds)
+    if selection.get("selection") != "due":
+        result = {"schema": RESULT_SCHEMA, "state": selection.get("selection", "unknown"),
+            "selection": selection, "authority": "none"}
+        return 0, result
+    request = selection.get("request")
+    if not isinstance(request, dict) or not isinstance(request.get("evaluation_id"), str):
+        raise ValueError("due selection lacks an evaluation identity")
+    evaluation_id = request["evaluation_id"]
+    tick_id = sha256((TICK_SCHEMA + "\0" + profile_digest + "\0" + evaluation_id).encode())
+    tick_root = ticks / tick_id.removeprefix("sha256:")
+    tick_root.mkdir(mode=0o700, exist_ok=True)
+    owned_directory(tick_root, "tick directory")
+    tick = write_once(tick_root / "tick.json", {"schema": TICK_SCHEMA, "tick_id": tick_id,
+        "profile_digest": profile_digest, "evaluation_id": evaluation_id,
+        "slot_id": request.get("slot", {}).get("slot_id"), "selected_at": now,
+        "authority": "none"})
+    if tick.get("evaluation_id") != evaluation_id or tick.get("profile_digest") != profile_digest:
+        raise ValueError("retained tick identity conflicts with current selection")
+    completion_path = tick_root / "result.json"
+    if completion_path.exists():
+        completion = strict_json(read_regular(completion_path, MAX_OUTPUT).removesuffix(b"\n"))
+        if completion.get("tick_id") != tick_id:
+            raise ValueError("retained completion has the wrong tick identity")
+        return 0, completion
+    evaluation = invoke(common + ["run", "--runtime-config", paths["runtime"].proc_path,
+        "--policy", paths["schedule"].proc_path, "--scheduler-clock-id",
+        profile["scheduler_clock_id"], "--at", tick["selected_at"]], timeout,
+        pass_fds=material_fds)
+    if evaluation.get("evaluation_id") != evaluation_id:
+        raise ValueError("Nightshift returned a different evaluation identity")
+    if evaluation.get("state") != "terminal":
+        result = {"schema": RESULT_SCHEMA, "tick_id": tick_id,
+            "evaluation_id": evaluation_id, "state": "indeterminate",
+            "evaluation_state": evaluation.get("state"), "next_step": "inspect retained evaluation; do not repeat the source read",
+            "authority": "none"}
+        return 0, result
+    clock = write_once(tick_root / "attention-clock.json", {"evaluated_at": utc_now()})
+    bundle = invoke(common + ["attention-evaluate", "--policy", paths["attention"].proc_path,
+        "--evaluation-id", evaluation_id, "--evaluated-at", clock["evaluated_at"]], timeout,
+        pass_fds=material_fds)
+    receipt = bundle.get("receipt")
+    if not isinstance(receipt, dict) or receipt.get("evaluation_id") != evaluation_id:
+        raise ValueError("attention bundle does not bind the evaluation")
+    if not isinstance(receipt.get("maintenance"), dict):
+        raise ValueError("attention receipt does not retain explicit maintenance state")
+    delivery = None
+    if receipt.get("delivery_eligible") is True:
+        if parse_time(utc_now()) > parse_time(receipt["event_current_until"]):
+            delivery = {"state": "not_sent_stale", "human_receipt": "not_established"}
+        else:
+            receipt_digest = require_digest(receipt.get("receipt_digest"), "receipt_digest")
+            intent = {"schema": "nq.notification_delivery_intent.v1",
+                "attention_kind": "nightshift_receipt", "stable_event_id": receipt_digest,
+                "attention_receipt_digest": receipt_digest,
+                "attention_policy_id": receipt["policy_id"],
+                "attention_policy_digest": receipt["policy_digest"],
+                "transition_id": receipt_digest, "route_reference": profile["notification_route"],
+                "destination_identity": profile["notification_destination_identity"],
+                "summary": "Saved check needs attention; inspect the retained record.",
+                "inspection_reference": receipt["inspection_reference"], "owner_receipt": bundle}
+            if len(canonical(intent)) > 32 * 1024:
+                raise ValueError("local notification intent exceeds NQ's 32 KiB bound")
+            intent_path = tick_root / "notification-intent.json"
+            retained_intent = write_once(intent_path, intent, newline=False)
+            if retained_intent != intent:
+                raise ValueError("retained notification intent conflicts with attention receipt")
+            # The intent is a new exclusive-create custody record below the
+            # already verified service-owned tick directory. NQ performs its
+            # own bounded O_NOFOLLOW open of this record. Unlike enrolled
+            # executable/config material, it is not a prevalidated pathname.
+            delivery = invoke([paths["nq"].proc_path, "--config", paths["notification"].proc_path,
+                "--json", "notification", "deliver-local", "--intent", str(intent_path),
+                "--route", profile["notification_route"]], timeout,
+                pass_fds=material_fds)
+            if delivery.get("delivery_state") != "accepted" or delivery.get("human_receipt") != "not_established":
+                raise ValueError("local delivery did not retain accepted non-human custody")
+    result = {"schema": RESULT_SCHEMA, "tick_id": tick_id, "profile_digest": profile_digest,
+        "evaluation_id": evaluation_id, "evaluation_state": "terminal",
+        "attention_receipt_digest": receipt.get("receipt_digest"),
+        "attention_disposition": receipt.get("disposition"),
+        "attention_reason": receipt.get("reason"), "maintenance": receipt["maintenance"],
+        "delivery": delivery, "state": "complete", "authority": "none"}
+    retained = write_once(completion_path, result)
+    if retained != result:
+        raise ValueError("retained completion conflicts with current result")
+    return 0, result
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--profile", required=True, type=Path)
+    parser.add_argument("--at", help="explicit qualification clock; omit in installed service")
+    args = parser.parse_args(argv)
+    try:
+        code, result = run(args.profile, args.at)
+        print(canonical(result).decode())
+        return code
+    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
+        print(f"refused: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
