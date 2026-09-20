@@ -41,6 +41,55 @@ maintenance interface; its `covered`, `overrun`, `uncovered` or unavailable
 state remains explicit in the condition and attention receipt. Maintenance does
 not turn a failed check into success.
 
+## Run the disposable public example
+
+[`examples/saved-check-installed-local.py`](../../examples/saved-check-installed-local.py)
+exercises the composition without installing a service or changing system
+configuration. It creates a 20-row SQLite queue under one fresh local root,
+acquires it through Monitor, evaluates the saved check and maintenance
+declaration through NQ, runs the Nightshift tick, delivers one local-file
+attention record, and inspects both owner stores. It then verifies exact
+same-slot replay, overlap refusal, and a missed slot with no catch-up.
+
+Use the exact public component revisions pinned by the matching integration
+release manifest. On Linux with Python 3.11+, Rust and Cargo, build those public
+clones with:
+
+```sh
+cargo build --release --manifest-path constellation-nightshift/runtime/Cargo.toml -p nightshiftd
+cargo build --release --manifest-path constellation-nq/Cargo.toml -p nq-app
+cargo build --release --manifest-path constellation-monitor/Cargo.toml -p monitor-project-concerns
+```
+
+Then choose an absolute path that does not exist and run the example from the
+Nightshift checkout:
+
+```sh
+demo_root=/tmp/saved-check-demo-public-001
+test ! -e "$demo_root"
+python3 examples/saved-check-installed-local.py \
+  --root "$demo_root" \
+  --nightshift "$PWD/runtime/target/release/nightshift" \
+  --nq /absolute/path/to/constellation-nq/target/release/nq \
+  --monitor /absolute/path/to/constellation-monitor/target/release/monitor-concerns
+```
+
+The final JSON names the exact Nightshift evaluation, NQ notification and
+retained inspection paths. `commands.jsonl` records command identities and
+output digests, not component output. The SQLite databases and local inbox are
+the owner records. Keep the root while an outcome is uncertain; remove it only
+after inspection when the disposable records are no longer needed.
+
+This example uses real local component processes and real SQLite reads. The
+queue and maintenance declaration are intentionally synthetic, local-file
+delivery establishes custody rather than human acknowledgment, and no
+downstream action is authorized. Same-slot replay proves that the completed
+composition does not deliver twice. This example does not inject response loss
+after NQ has accepted delivery; after such a loss, inspect the exact NQ
+notification and Nightshift evaluation before considering another invocation.
+It also does not exercise systemd activation or the system installation
+boundary described below.
+
 ## Install and start
 
 Build and install the exact pinned Nightshift, Monitor and NQ cohort first.
