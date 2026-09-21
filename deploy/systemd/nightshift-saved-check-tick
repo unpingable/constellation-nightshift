@@ -434,7 +434,11 @@ def write_once(path: Path, value: dict, *, newline: bool = True) -> dict:
 
 
 def utc_now() -> str:
-    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    # Preserve subsecond precision. A newly retained evaluation may have a
+    # fractional projection timestamp; rounding the later attention clock down
+    # to the whole second can make that clock appear to precede its input and
+    # incorrectly suppress otherwise-current delivery.
+    return dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def parse_time(value: str) -> dt.datetime:

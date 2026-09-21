@@ -5,7 +5,10 @@
 This is a public newcomer example, not a service installer. It performs an
 actual Monitor acquisition, NQ saved-check evaluation and local-file delivery,
 and a Nightshift recurrence/attention tick. It creates only the absent
-directory named by --root and configures no network or provider route.
+directory named by --root and configures no network or provider route. The
+single-user fixture requires a debug NQ build's explicit same-identity helper
+exception; an installed release build requires a distinct enrolled helper
+account.
 """
 
 from __future__ import annotations
@@ -358,6 +361,7 @@ def run(args: argparse.Namespace) -> dict:
     summary = {
         "schema": "nightshift.saved-check-public-example-result/v1",
         "result": "qualified", "authority": "none", "network_routes_configured": 0,
+        "helper_identity": "debug_same_uid_fixture_only",
         "input": "disposable 20-row SQLite queue", "root": str(root),
         "tick_id": first["tick_id"], "evaluation_id": evaluation_id,
         "attention_receipt_digest": attention_record["receipt_digest"],

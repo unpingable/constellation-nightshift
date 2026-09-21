@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+import datetime as dt
 import fcntl
 import hashlib
 import importlib.util
@@ -29,6 +30,15 @@ def write(path, value):
 
 
 class SavedCheckTickTests(unittest.TestCase):
+    def test_utc_now_preserves_subsecond_ordering(self):
+        class FixedDateTime(dt.datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2026, 9, 21, 1, 37, 57, 600_123, tzinfo=tz)
+
+        with mock.patch.object(TICK.dt, "datetime", FixedDateTime):
+            self.assertEqual(TICK.utc_now(), "2026-09-21T01:37:57.600123Z")
+
     def fixture(self, root: Path, *, terminal=True, local=True, selection="due",
                 event_until="2099-01-01T00:00:00Z"):
         calls = root / "calls"
