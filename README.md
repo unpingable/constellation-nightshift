@@ -41,7 +41,9 @@ in this source cut.
 
 For actual project acquisition and independent support, the additional
 [`integrations/monitor-predicate-support`](integrations/monitor-predicate-support/)
-source cut distributes the existing Monitor and Pulse components. Its
+source cut is a pinned compatibility export of the canonical public
+[`constellation-monitor`](https://github.com/unpingable/constellation-monitor)
+repository, which hosts Monitor and Pulse. Its
 [local queue caller](integrations/monitor-predicate-support/docs/local-queue-attention.md)
 connects them to public NQ and this runtime, including refusal and stale-state
 recovery checks. It does not send a live notification or authorize execution.

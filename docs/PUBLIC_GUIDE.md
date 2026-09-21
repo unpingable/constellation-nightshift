@@ -42,7 +42,9 @@ Replay checks retained consistency; notification delivery and evidence
 currentness remain separate checks.
 
 The separate [Monitor/Pulse source cut](../integrations/monitor-predicate-support/)
-and [local queue example](../integrations/monitor-predicate-support/docs/local-queue-attention.md)
+is a pinned compatibility export of the canonical public
+[`constellation-monitor`](https://github.com/unpingable/constellation-monitor)
+repository. Its [local queue example](../integrations/monitor-predicate-support/docs/local-queue-attention.md)
 exercise actual acquisition, NQ admission, support and attention, ending in an
 intentional no-network delivery refusal. Select its own manifest when building
 those components. No private sibling dependency or live notification is implied.

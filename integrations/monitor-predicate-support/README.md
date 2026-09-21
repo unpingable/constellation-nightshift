@@ -1,5 +1,12 @@
 # Acquire project observations and check independent support
 
+The canonical public development source is
+[`unpingable/constellation-monitor`](https://github.com/unpingable/constellation-monitor)
+at public revision `45296872d161a79d345571d88d23725b04ff0236`. This directory remains a
+generated compatibility export for profiles that pin this Nightshift history;
+it is not a second Monitor implementation. Its frozen inputs and generation
+procedure remain recorded below and in `SOURCE-PROVENANCE.json`.
+
 This source-only distribution supplies Monitor's bounded project acquisition
 and Pulse's support/currentness check for public NQ bounded predicates. It is
 part of the existing products, not a new component or orchestration framework.

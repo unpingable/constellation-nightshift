@@ -1,5 +1,12 @@
 # Pulse NQ host-load support
 
+The canonical public development source is
+[`unpingable/constellation-monitor`](https://github.com/unpingable/constellation-monitor)
+at public revision `45296872d161a79d345571d88d23725b04ff0236`. Pulse remains hosted within
+Monitor and has no separate repository. This directory is a generated
+compatibility export retained for profiles that pin this Nightshift history;
+its source revision and generation procedure remain frozen below.
+
 This source-only Apache-2.0 distribution contains the bounded host-load evidence
 adapter used by an explicitly configured Nightshift integration. Canonical source
 revision: `0997dcb30b58def78537ceeeb469c779eb9905f1`. See `SOURCE-PROVENANCE.json` for exact source and layout
