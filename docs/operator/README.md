@@ -13,23 +13,11 @@ Prerequisites:
 - a native C compiler and linker for the bundled SQLite build; and
 - crates.io access for an uncached first build.
 
-The current workspace has two load-bearing sibling path dependencies. Use
-compatible source checkouts in this exact layout:
-
-```text
-<source-parent>/
-├── nightshift/
-├── wicket/
-└── wlp/
-```
-
-Night Shift does not discover or download `wicket` or `wlp`. From the
-`nightshift/` directory:
-
-```sh
-cargo build --locked --release
-./target/release/nightshift --help
-```
+The repository-root workspace is retained predecessor material. Its manifest
+still names WLP, which is retired. It is not a supported fresh-install route:
+do not restore WLP or assemble historical sibling checkouts to build it. Use
+the source-pinned `runtime/` workspace or a selected integration profile; the
+matching profile documents its exact prerequisites and commands.
 
 Live NQ-backed reads additionally require an independently installed
 `nq-monitor` executable. Prefer an absolute path. Inject it through the

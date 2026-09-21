@@ -1,5 +1,11 @@
 # Night Shift
 
+The current immutable Constellation integration release is
+[0.1.0-alpha.6](https://unpingable.com/constellation/releases/0.1.0-alpha.6/guide.html).
+It qualifies one reviewed local-copy effect through the composed workflow; it
+does not turn Nightshift into an authority or executor, and it does not qualify
+general recurrence, notification delivery, or a production deployment.
+
 New here? Read the [Nightshift newcomer guide](docs/PUBLIC_GUIDE.md) for the
 public-main source-build, read-only inspection, and qualification boundaries.
 
@@ -90,24 +96,16 @@ build requires:
 - network access to crates.io on the first build, unless the Cargo cache is
   already populated or dependencies are supplied by another approved means.
 
-The current Cargo contract uses sibling path dependencies. Keep compatible
-`wicket` and `wlp` source trees beside the Night Shift checkout:
-
-```text
-<source-parent>/
-├── nightshift/
-├── wicket/
-└── wlp/
-```
-
-The directory names and relative placement are load-bearing today:
-`nightshift/Cargo.toml` resolves `../wicket` and `../wlp`. Night Shift does
-not fetch, discover, or install those repositories. From `nightshift/`:
-
-```bash
-cargo build --locked --release
-./target/release/nightshift --help
-```
+The current repository-root workspace is a preserved predecessor source tree.
+It has sibling path dependencies and is not the recommended public starting
+path. WLP is retired and must not be installed or restored for a new setup.
+Use the source-pinned runtime and the selected integration profile instead.
+The retained root manifest still names historical sibling dependencies,
+including WLP. Since WLP is retired, that workspace is intentionally not a
+supported fresh-build path. Do not recreate a WLP checkout to make it build.
+Build the source-pinned `runtime/` workspace or use the selected integration
+profile instead; its dependency and revision requirements are recorded with
+that profile.
 
 NQ is also an external runtime dependency for live finding, liveness, and
 reliance reads; it is not built by this workspace. For operational runs,

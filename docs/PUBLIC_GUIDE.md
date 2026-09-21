@@ -1,5 +1,11 @@
 # Nightshift newcomer guide
 
+The current immutable Constellation integration release is
+[0.1.0-alpha.6](https://unpingable.com/constellation/releases/0.1.0-alpha.6/guide.html).
+Use its walkthrough for the first supported composed path. It qualifies one
+bounded reviewed local-copy effect, not a general scheduler, notification
+delivery, or deployment.
+
 Nightshift records deferred-work context, reconciles it before producing a
 review packet, and preserves receipts for its scheduling lifecycle. It does
 not authorize or execute a change. On this public `main` branch, its optional
@@ -54,26 +60,14 @@ revisions.
 
 ## Preserved predecessor: source build and inspection
 
-This branch is a source workspace, not an installed package. It requires Git,
-Rust 1.82 or newer, a native C compiler/linker for bundled SQLite, and public
-Wicket and WLP source checkouts beside the Nightshift checkout. Acquire those
-three public repositories together; no local private sibling is implied:
-
-```sh
-git clone https://github.com/unpingable/constellation-nightshift.git nightshift
-git clone https://github.com/unpingable/wicket.git wicket
-git clone https://github.com/unpingable/wlp.git wlp
-```
-
-The directory names and placement are load-bearing because `Cargo.toml` names
-`../wicket` and `../wlp`. Keep revisions compatible with the checked-out
-Nightshift source. Its first dependency resolution may need crates.io access
-unless the required Cargo material is already available.
-
-```sh
-cargo build --locked --release
-./target/release/nightshift --help
-```
+This repository-root workspace is retained predecessor material, not the
+recommended current installation path. It requires Git, Rust 1.82 or newer, a
+native C compiler/linker for bundled SQLite, and historical sibling checkouts.
+Its root manifest still names WLP. WLP is retired; do not clone, install, or
+restore it to make that predecessor workspace build. The root workspace is
+therefore not a supported fresh-install route. Use the source-pinned
+`runtime/` workspace above or the selected integration profile, whose manifest
+states the exact source and toolchain requirements.
 
 The [operator guide](operator/README.md) documents its current public command
 surface, including read-only `nq disposition` input and the fixture-backed
