@@ -479,6 +479,14 @@ enum CycleCommand {
         #[arg(long, requires = "plan_ref")]
         maude_session_id: Option<String>,
     },
+    /// Read-only exact plan/work relation retained by a precompiled cycle.
+    /// This does not claim Maude session custody or grant authority.
+    ExportPrecompiledWorkflowLineage {
+        #[arg(long)]
+        campaign_id: String,
+        #[arg(long)]
+        occurrence_id: String,
+    },
     List,
     Replay {
         #[arg(long)]
@@ -1761,6 +1769,13 @@ fn run_cycle_command_bound(
             )?;
             let store = CanonicalStore::open_read_only(store_path)?;
             write_exact(&store.export_authoring_custody(query)?)
+        }
+        CycleCommand::ExportPrecompiledWorkflowLineage {
+            campaign_id,
+            occurrence_id,
+        } => {
+            let store = CanonicalStore::open_read_only(store_path)?;
+            write_exact(&store.export_precompiled_workflow_lineage(&campaign_id, &occurrence_id)?)
         }
         CycleCommand::Replay { cycle_id } => {
             let store = CanonicalStore::open(store_path)?;

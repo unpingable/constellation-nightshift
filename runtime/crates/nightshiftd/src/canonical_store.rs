@@ -60,6 +60,10 @@ pub const TYPED_INTENT_SCHEMA_V2: &str = "nightshift.typed_coarse_intent.v2";
 pub const AG_REFERENCE_SCHEMA_V1: &str = "nightshift.ag_occurrence_reference.v1";
 pub const AG_REFUSAL_SCHEMA_V1: &str = "nightshift.ag_refusal_reference.v1";
 pub const PREPARED_AG_REQUEST_SCHEMA_V1: &str = "nightshift.prepared_ag_request.v1";
+pub const PRECOMPILED_WORKFLOW_LINEAGE_SCHEMA_V1: &str =
+    "nightshift.precompiled_workflow_lineage.v1";
+pub const PRECOMPILED_WORKFLOW_LINEAGE_EXPORT_SCHEMA_V1: &str =
+    "nightshift.precompiled_workflow_lineage_export.v1";
 
 fn require_token(name: &str, value: &str) -> Result<(), CanonicalStoreError> {
     if value.trim().is_empty() || value.chars().any(char::is_whitespace) {
@@ -1044,6 +1048,131 @@ pub struct PreparedAgRequestV1 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ag_profile_binding: Option<AgProfileBindingV1>,
     pub exact_request: serde_json::Value,
+}
+
+/// Authority-neutral read projection of the exact plan/work relationship
+/// already retained by a precompiled Nightshift cycle. This does not claim a
+/// Maude supervised session or authoring-custody handoff.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PrecompiledWorkflowLineageV1 {
+    pub schema: String,
+    pub lineage_id: String,
+    pub producer_component: String,
+    pub campaign_id: String,
+    pub occurrence_id: String,
+    pub proposal_id: String,
+    pub exact_work_id: String,
+    pub plan_document_ref: String,
+    pub source_intent_id: String,
+    pub cycle_id: String,
+    pub cycle_state_digest: String,
+    pub source_cycle_request_id: String,
+    pub source_cycle_request_digest: String,
+}
+
+impl PrecompiledWorkflowLineageV1 {
+    fn from_cycle(cycle: &ObservationCycleV1) -> Result<Option<Self>, CanonicalStoreError> {
+        let (Some(intent), Some(request)) = (&cycle.intent, &cycle.prepared_ag_request) else {
+            return Ok(None);
+        };
+        let Some(plan_document_ref) = intent
+            .immutable_parameters
+            .get("plan_document")
+            .and_then(serde_json::Value::as_str)
+        else {
+            return Ok(None);
+        };
+        require_digest("precompiled plan_document", plan_document_ref)?;
+        let source_cycle_request_id = request.source_cycle_request_id.clone().ok_or_else(|| {
+            CanonicalStoreError::Invalid(
+                "precompiled workflow lineage lacks source cycle request identity".into(),
+            )
+        })?;
+        let source_cycle_request_digest =
+            request.source_cycle_request_digest.clone().ok_or_else(|| {
+                CanonicalStoreError::Invalid(
+                    "precompiled workflow lineage lacks source cycle request digest".into(),
+                )
+            })?;
+        let proposal_input = request.exact_request.get("proposal_input").ok_or_else(|| {
+            CanonicalStoreError::Invalid(
+                "precompiled workflow lineage lacks exact proposal input".into(),
+            )
+        })?;
+        let proposal_id =
+            ag_proposal_identity(proposal_input).map_err(CanonicalStoreError::Invalid)?;
+        let exact_work_id =
+            exact_work_identity(proposal_input).map_err(CanonicalStoreError::Invalid)?;
+        if exact_work_id != intent.expected_ag_work {
+            return Err(CanonicalStoreError::Invalid(
+                "precompiled workflow lineage work disagrees with typed intent".into(),
+            ));
+        }
+        let mut value = Self {
+            schema: PRECOMPILED_WORKFLOW_LINEAGE_SCHEMA_V1.into(),
+            lineage_id: String::new(),
+            producer_component: "nightshift.canonical_store".into(),
+            campaign_id: request.campaign_id.clone(),
+            occurrence_id: request.occurrence_id.clone(),
+            proposal_id,
+            exact_work_id,
+            plan_document_ref: plan_document_ref.to_owned(),
+            source_intent_id: intent.intent_id.clone(),
+            cycle_id: cycle.cycle_id.as_str().to_owned(),
+            cycle_state_digest: cycle.state_digest.clone(),
+            source_cycle_request_id,
+            source_cycle_request_digest,
+        };
+        value.lineage_id = object_id(&value, "lineage_id")?;
+        value.validate()?;
+        Ok(Some(value))
+    }
+
+    pub fn validate(&self) -> Result<(), CanonicalStoreError> {
+        if self.schema != PRECOMPILED_WORKFLOW_LINEAGE_SCHEMA_V1
+            || self.producer_component != "nightshift.canonical_store"
+        {
+            return Err(CanonicalStoreError::Invalid(
+                "unsupported precompiled workflow lineage".into(),
+            ));
+        }
+        for (name, value) in [
+            ("lineage_id", &self.lineage_id),
+            ("campaign_id", &self.campaign_id),
+            ("proposal_id", &self.proposal_id),
+            ("exact_work_id", &self.exact_work_id),
+            ("plan_document_ref", &self.plan_document_ref),
+            ("source_intent_id", &self.source_intent_id),
+            ("cycle_state_digest", &self.cycle_state_digest),
+            ("source_cycle_request_id", &self.source_cycle_request_id),
+            (
+                "source_cycle_request_digest",
+                &self.source_cycle_request_digest,
+            ),
+        ] {
+            require_digest(name, value)?;
+        }
+        require_token("occurrence_id", &self.occurrence_id)?;
+        require_token("cycle_id", &self.cycle_id)?;
+        if self.lineage_id != object_id(self, "lineage_id")? {
+            return Err(CanonicalStoreError::Invalid(
+                "precompiled workflow lineage self-digest mismatch".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Exact occurrence-scoped read result. An empty match set means Nightshift
+/// retained no precompiled plan relation for that occurrence.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PrecompiledWorkflowLineageExportV1 {
+    pub schema: String,
+    pub campaign_id: String,
+    pub occurrence_id: String,
+    pub matches: Vec<PrecompiledWorkflowLineageV1>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -2428,6 +2557,37 @@ impl CanonicalStore {
             })
             .collect::<Result<Vec<_>, _>>()?;
         AuthoringContextExportV1::new(query, matches).map_err(CanonicalStoreError::Invalid)
+    }
+
+    /// Exact precompiled plan/work relation for one governed occurrence.
+    /// This reads and validates the authoritative cycle snapshot and never
+    /// mutates the cycle, claims authoring custody, or supplies authority.
+    pub fn export_precompiled_workflow_lineage(
+        &self,
+        campaign_id: &str,
+        occurrence_id: &str,
+    ) -> Result<PrecompiledWorkflowLineageExportV1, CanonicalStoreError> {
+        require_digest("campaign_id", campaign_id)?;
+        require_token("occurrence_id", occurrence_id)?;
+        let mut matches = Vec::new();
+        for cycle in self.list_cycles()? {
+            let Some(request) = &cycle.prepared_ag_request else {
+                continue;
+            };
+            if request.campaign_id != campaign_id || request.occurrence_id != occurrence_id {
+                continue;
+            }
+            if let Some(lineage) = PrecompiledWorkflowLineageV1::from_cycle(&cycle)? {
+                matches.push(lineage);
+            }
+        }
+        matches.sort_by(|left, right| left.lineage_id.cmp(&right.lineage_id));
+        Ok(PrecompiledWorkflowLineageExportV1 {
+            schema: PRECOMPILED_WORKFLOW_LINEAGE_EXPORT_SCHEMA_V1.into(),
+            campaign_id: campaign_id.to_owned(),
+            occurrence_id: occurrence_id.to_owned(),
+            matches,
+        })
     }
 
     /// Exact authenticated custody records for one authoring identity query.
@@ -4642,5 +4802,33 @@ mod tests {
         assert!(error
             .to_string()
             .contains("predates the authoring-context provenance projection"));
+    }
+
+    #[test]
+    fn precompiled_workflow_lineage_self_digest_refuses_substitution() {
+        let mut value = PrecompiledWorkflowLineageV1 {
+            schema: PRECOMPILED_WORKFLOW_LINEAGE_SCHEMA_V1.into(),
+            lineage_id: String::new(),
+            producer_component: "nightshift.canonical_store".into(),
+            campaign_id: digest('a'),
+            occurrence_id: "00000000-0000-4000-8000-000000000001".into(),
+            proposal_id: digest('b'),
+            exact_work_id: digest('c'),
+            plan_document_ref: digest('d'),
+            source_intent_id: digest('e'),
+            cycle_id: "cycle:00000000-0000-4000-8000-000000000002".into(),
+            cycle_state_digest: digest('f'),
+            source_cycle_request_id: digest('1'),
+            source_cycle_request_digest: digest('2'),
+        };
+        value.lineage_id = object_id(&value, "lineage_id").unwrap();
+        value.validate().unwrap();
+
+        value.exact_work_id = digest('3');
+        assert!(value
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("self-digest mismatch"));
     }
 }

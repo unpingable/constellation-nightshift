@@ -14,6 +14,10 @@ The additive [`runtime/`](runtime/) workspace is the source-pinned canonical
 cycle and Foreman runtime. Its exact inputs are recorded in
 [`runtime/SOURCE-PROVENANCE.json`](runtime/SOURCE-PROVENANCE.json); see the
 [`runtime` custody guide](runtime/docs/BOUNDED_PROVIDER_CUSTODY_V1.md).
+Closed precompiled workflows can expose their retained exact plan/proposal/work
+relation through the authority-neutral
+[precompiled workflow lineage read](runtime/docs/PRECOMPILED_WORKFLOW_LINEAGE.md).
+That projection does not backfill or replace Maude session custody.
 Build it with `cargo build --locked --manifest-path runtime/Cargo.toml`.
 The distributed focused test gates cover Foreman and attention replay:
 
