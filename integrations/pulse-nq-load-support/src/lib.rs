@@ -38,6 +38,11 @@ pub const PROFILE_SEMANTIC_ID: &str =
 /// still selects one exact identity and receipts cannot cross between them.
 pub const LOCAL_SUCCESSOR_PROFILE_SEMANTIC_ID: &str =
     "sha256:fb7bce89e23f88174e87309002b78a9fc78e45db748252cc76aff0ecade79490";
+/// The nq.host identity emitted by the NQ 0.2.0 release (`v0.2.0`, 82af0ac).
+/// It is a further explicit cohort; the earlier identities remain enrolled so
+/// alpha.6 evidence still replays.
+pub const NQ_0_2_0_PROFILE_SEMANTIC_ID: &str =
+    "sha256:c08ea495bc40a18171653825f732872b73454cbec00c38a514dea5fe1d13794c";
 pub const THRESHOLD_POLICY_ID: &str = "nq.host.load_pressure.threshold_policy";
 pub const THRESHOLD_POLICY_VERSION: &str = "1";
 pub const THRESHOLD_POLICY_DIGEST: &str =
@@ -160,6 +165,7 @@ impl LoadSupportConfigV1 {
         )?;
         if self.profile_semantic_id != PROFILE_SEMANTIC_ID
             && self.profile_semantic_id != LOCAL_SUCCESSOR_PROFILE_SEMANTIC_ID
+            && self.profile_semantic_id != NQ_0_2_0_PROFILE_SEMANTIC_ID
         {
             return Err("profile_semantic_id is not the qualified NQ host v1 identity".into());
         }

@@ -4,11 +4,12 @@ use std::process::{Command, Stdio};
 
 use ed25519_dalek::SigningKey;
 use pulse_nq_load_support::{
-    CONFIG_SCHEMA, ExpectedDiagnosticV1, LoadPressureStateV1, LoadSupportConfigV1, PROFILE_DIGEST,
-    PROFILE_ID, PROFILE_SEMANTIC_ID, PROFILE_VERSION, PresentEvidenceQueryV1,
-    QUALIFIED_SUPPORT_SCHEMA, QUESTION_DIGEST, QUESTION_ID, QUESTION_VERSION, QualifiedStandingV1,
-    QualifiedSupportV1, ReceivedLoadPressureSupportV1, SUPPORT_FAMILY, SemanticIdentityV1,
-    THRESHOLD_POLICY_DIGEST, THRESHOLD_POLICY_ID, THRESHOLD_POLICY_VERSION,
+    CONFIG_SCHEMA, ExpectedDiagnosticV1, LoadPressureStateV1, LoadSupportConfigV1,
+    NQ_0_2_0_PROFILE_SEMANTIC_ID, PROFILE_DIGEST, PROFILE_ID, PROFILE_SEMANTIC_ID, PROFILE_VERSION,
+    PresentEvidenceQueryV1, QUALIFIED_SUPPORT_SCHEMA, QUESTION_DIGEST, QUESTION_ID,
+    QUESTION_VERSION, QualifiedStandingV1, QualifiedSupportV1, ReceivedLoadPressureSupportV1,
+    SUPPORT_FAMILY, SemanticIdentityV1, THRESHOLD_POLICY_DIGEST, THRESHOLD_POLICY_ID,
+    THRESHOLD_POLICY_VERSION,
 };
 use serde::Serialize;
 use sha2::{Digest as _, Sha256};
@@ -271,5 +272,65 @@ fn real_roles_cross_the_closed_launcher_process_boundary() {
             .count(),
         1,
         "resolver must not invoke a producer"
+    );
+}
+
+/// A real `nq.diagnostic_execution.v2` host export from the NQ 0.2.0 release
+/// acceptance VM. Pulse must accept the identities it carries.
+#[test]
+fn nq_0_2_0_host_export_identity_is_enrolled() {
+    let artifact: serde_json::Value =
+        serde_json::from_slice(include_bytes!("fixtures/nq-0.2.0-host-artifact.json"))
+            .expect("NQ 0.2.0 export");
+    assert_eq!(artifact["schema"], "nq.diagnostic_execution.v2");
+    assert_eq!(
+        artifact["profile_semantic_id"],
+        NQ_0_2_0_PROFILE_SEMANTIC_ID
+    );
+    assert_eq!(artifact["profile"]["id"], PROFILE_ID);
+    assert_eq!(artifact["profile"]["version"], PROFILE_VERSION);
+    assert_eq!(artifact["profile"]["digest"], PROFILE_DIGEST);
+    assert_eq!(artifact["question"]["id"], QUESTION_ID);
+    assert_eq!(artifact["question"]["digest"], QUESTION_DIGEST);
+    assert_eq!(artifact["threshold_policy"]["id"], THRESHOLD_POLICY_ID);
+    assert_eq!(
+        artifact["threshold_policy"]["digest"],
+        THRESHOLD_POLICY_DIGEST
+    );
+
+    let root = TempDir::new().expect("tempdir");
+    let (mut config, config_path) = fixture(&root);
+    config.profile_semantic_id = artifact["profile_semantic_id"]
+        .as_str()
+        .expect("semantic id")
+        .into();
+    fs::write(
+        &config_path,
+        serde_jcs::to_vec(&config).expect("canonical config"),
+    )
+    .expect("write config");
+    let binary = env!("CARGO_BIN_EXE_pulse-nq-load-support");
+    for role in ["produce", "ingest"] {
+        let output = Command::new(binary)
+            .args([
+                role,
+                "--config",
+                config_path.to_str().expect("config path"),
+                "--acquisition-id",
+                "support:nq-0.2.0",
+            ])
+            .output()
+            .expect("role process");
+        assert!(
+            output.status.success(),
+            "{role}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    assert_eq!(
+        fs::read_dir(&config.receipt_directory)
+            .expect("receipts")
+            .count(),
+        1
     );
 }
