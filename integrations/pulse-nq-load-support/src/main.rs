@@ -8,7 +8,43 @@ use pulse_nq_load_support::{
     LoadSupportConfigV1, PresentEvidenceQueryV1, ingest, produce, resolve,
 };
 
+#[cfg(test)]
+mod source_commit;
+
+include!(concat!(env!("OUT_DIR"), "/source_commit_generated.rs"));
+
+const COMPONENT: &str = "pulse-nq-load-support";
+const BUILD_INFO_SCHEMA: &str = "pulse_nq_load_support.build_info.v1";
+
+/// Answer `--version` or `--build-info` when it is the only argument, for
+/// every executable role, before any configuration or input is read.
+fn identity_request() -> Option<String> {
+    let mut arguments = env::args_os().skip(1);
+    let first = arguments.next()?;
+    if arguments.next().is_some() {
+        return None;
+    }
+    match first.to_str()? {
+        "--version" => Some(format!("{COMPONENT} {VERSION_STRING}")),
+        "--build-info" => Some(
+            serde_json::json!({
+                "schema": BUILD_INFO_SCHEMA,
+                "component": COMPONENT,
+                "version": env!("CARGO_PKG_VERSION"),
+                "debug_assertions": cfg!(debug_assertions),
+                "source_commit": SOURCE_COMMIT,
+            })
+            .to_string(),
+        ),
+        _ => None,
+    }
+}
+
 fn main() {
+    if let Some(identity) = identity_request() {
+        println!("{identity}");
+        return;
+    }
     if let Err(error) = run() {
         eprintln!("{error}");
         std::process::exit(2);
@@ -91,4 +127,33 @@ fn resolver_command(args: &[String]) -> Result<(), String> {
         .write_all(&output)
         .map_err(|error| error.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod identity_tests {
+    use super::source_commit::{SOURCE_COMMIT_VARIABLE, parse_source_commit};
+    use super::{SOURCE_COMMIT, VERSION_STRING};
+
+    #[test]
+    fn version_string_carries_the_recorded_commit() {
+        match SOURCE_COMMIT {
+            Some(commit) => assert_eq!(
+                VERSION_STRING,
+                format!("{} ({commit})", env!("CARGO_PKG_VERSION"))
+            ),
+            None => assert_eq!(VERSION_STRING, env!("CARGO_PKG_VERSION")),
+        }
+    }
+
+    #[test]
+    fn source_commit_accepts_only_a_full_lowercase_commit_id() {
+        let commit = "0123456789abcdef0123456789abcdef01234567";
+        assert_eq!(parse_source_commit(None), Ok(None));
+        assert_eq!(parse_source_commit(Some("")), Ok(None));
+        assert_eq!(parse_source_commit(Some(commit)), Ok(Some(commit)));
+        for rejected in ["0123456789ABCDEF0123456789abcdef01234567", "abc", "HEAD"] {
+            let error = parse_source_commit(Some(rejected)).expect_err(rejected);
+            assert!(error.contains(SOURCE_COMMIT_VARIABLE), "{error}");
+        }
+    }
 }
