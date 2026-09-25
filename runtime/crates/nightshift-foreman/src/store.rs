@@ -78,6 +78,8 @@ pub enum ForemanError {
     ReadOnlyStore(String),
     #[error("serialization failed: {0}")]
     Serialization(String),
+    #[error("retained authority not current: {0}")]
+    AuthorityNotCurrent(&'static str),
 }
 
 enum StoreAccess {
@@ -1558,6 +1560,7 @@ impl ForemanStore {
             }
         }
         let (packet, admission, profile, _) = load_contracts(&transaction, run_id)?;
+        require_current_authority(&packet, &admission, recorded_at)?;
         let capacity_requirement = load_capacity_requirement(&transaction, run_id)?;
         let execution_availability = load_execution_availability_history(
             &transaction,
@@ -1766,6 +1769,7 @@ impl ForemanStore {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         exact_active_attempt(&transaction, run_id, work_item_id, attempt_id)?;
         let (packet, admission, profile, _) = load_contracts(&transaction, run_id)?;
+        require_current_authority(&packet, &admission, opened_at)?;
         let history = load_execution_availability_history(
             &transaction,
             run_id,
@@ -1944,6 +1948,7 @@ impl ForemanStore {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         exact_active_attempt(&transaction, run_id, work_item_id, attempt_id)?;
         let (packet, admission, profile, _) = load_contracts(&transaction, run_id)?;
+        require_current_authority(&packet, &admission, opened_at)?;
         let history = load_execution_availability_history(
             &transaction,
             run_id,
@@ -2192,6 +2197,7 @@ impl ForemanStore {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         exact_active_attempt(&transaction, run_id, work_item_id, attempt_id)?;
         let (packet, admission, profile, _) = load_contracts(&transaction, run_id)?;
+        require_current_authority(&packet, &admission, recorded_at)?;
         let history = load_execution_availability_history(
             &transaction,
             run_id,
@@ -5029,6 +5035,25 @@ type RawContractRow = (
     String,
     u16,
 );
+
+/// Re-check the retained packet and admission windows at a transition that
+/// starts or continues provider work. `load_contracts` checks integrity only;
+/// admission is the only other place these windows are evaluated. The bounds
+/// are exactly `NightshiftPacketV1::validate_at` and
+/// `ForemanAdmissionV1::validate_at`.
+fn require_current_authority(
+    packet: &NightshiftPacketV1,
+    admission: &ForemanAdmissionV1,
+    at: DateTime<Utc>,
+) -> Result<(), ForemanError> {
+    if at < packet.created_at || at > packet.current_until {
+        return Err(ForemanError::AuthorityNotCurrent("packet not current"));
+    }
+    if at < admission.admitted_at || at > admission.expires_at {
+        return Err(ForemanError::AuthorityNotCurrent("admission expired"));
+    }
+    Ok(())
+}
 
 fn load_contracts(
     connection: &Connection,

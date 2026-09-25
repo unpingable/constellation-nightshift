@@ -4760,6 +4760,150 @@ fn holding_store_parks_restarts_wakes_falls_back_and_allows_independent_lane() {
 }
 
 #[test]
+fn holding_wake_prepare_and_resume_refuse_after_admission_expiry() {
+    // The fixture admission expires at 13:00:00Z; the packet stays current
+    // until 14:00:00Z, so the admission window is the binding bound here.
+    let expired = holding_time("2026-08-31T13:00:01Z");
+    let (_directory, path, store, _packet, _admission, _profile, policy, requirement) =
+        holding_setup();
+    let (attempt, opened) = holding_open_initial(&store);
+    let parked = holding_record(
+        &store,
+        &requirement,
+        &policy,
+        &opened,
+        "parked",
+        holding_time("2026-08-31T12:01:02Z"),
+        None,
+    );
+    assert_eq!(
+        parked.mechanism_state,
+        ProviderMechanismStateV1::ParkedNotAdmitted
+    );
+    let wake_at = parked.provider_retry_after.unwrap();
+    assert!(wake_at < expired);
+    drop(store);
+
+    let restarted = ForemanStore::open(&path).unwrap();
+    let late_wake = restarted.wake_provider_dispatch(
+        "run-holding-store",
+        "work-a",
+        &attempt.attempt_id,
+        "wake-late-1",
+        "dispatch-late-2",
+        "adapter-process-late-2",
+        "session-late-2",
+        1,
+        expired,
+    );
+    assert!(
+        matches!(
+            late_wake,
+            Err(ForemanError::AuthorityNotCurrent("admission expired"))
+        ),
+        "{late_wake:?}"
+    );
+    let late_prepare = restarted.prepare_provider_attempt(
+        "run-holding-store",
+        "work-b",
+        "dispatch-late-independent-1",
+        "adapter-process-late-independent-1",
+        "session-late-independent-1",
+        0,
+        expired,
+    );
+    assert!(
+        matches!(
+            late_prepare,
+            Err(ForemanError::AuthorityNotCurrent("admission expired"))
+        ),
+        "{late_prepare:?}"
+    );
+    let late_legacy = restarted.prepare_attempt("run-holding-store", "work-b", expired);
+    assert!(
+        matches!(
+            late_legacy,
+            Err(ForemanError::AuthorityNotCurrent("admission expired"))
+        ),
+        "{late_legacy:?}"
+    );
+
+    // The refusals left no partial state: the same wake inside the window
+    // still opens exactly the second dispatch.
+    let next = restarted
+        .wake_provider_dispatch(
+            "run-holding-store",
+            "work-a",
+            &attempt.attempt_id,
+            "wake-late-1",
+            "dispatch-late-2",
+            "adapter-process-late-2",
+            "session-late-2",
+            1,
+            wake_at,
+        )
+        .unwrap();
+    assert_eq!(next.dispatch.dispatch_ordinal, 2);
+    let query = ForemanStore::open_read_only(&path).unwrap();
+    let snapshot = query.read_only_run_snapshot("run-holding-store").unwrap();
+    let mechanism = snapshot.execution_availability.unwrap();
+    assert_eq!(mechanism.dispatches.len(), 2);
+    assert_eq!(mechanism.wake_occurrence_ids, vec!["wake-late-1"]);
+}
+
+#[test]
+fn holding_resume_refuses_after_admission_expiry() {
+    let (_directory, path, store, _packet, _admission, _profile, policy, requirement) =
+        holding_setup();
+    let (attempt, opened) = holding_open_initial(&store);
+    let interrupted = holding_record(
+        &store,
+        &requirement,
+        &policy,
+        &opened,
+        "interrupted",
+        holding_time("2026-08-31T12:01:02Z"),
+        None,
+    );
+    assert_eq!(
+        interrupted.mechanism_state,
+        ProviderMechanismStateV1::PostAdmissionInterrupted
+    );
+    drop(store);
+    let restarted = ForemanStore::open(&path).unwrap();
+    let execution = interrupted.provider_execution.clone().unwrap();
+    let late = restarted.resume_provider_execution(
+        "run-holding-store",
+        "work-a",
+        &attempt.attempt_id,
+        "resume-late-1",
+        &interrupted.disposition_digest,
+        "adapter-process-resume-late-1",
+        &execution,
+        holding_time("2026-08-31T13:00:01Z"),
+    );
+    assert!(
+        matches!(
+            late,
+            Err(ForemanError::AuthorityNotCurrent("admission expired"))
+        ),
+        "{late:?}"
+    );
+    restarted
+        .resume_provider_execution(
+            "run-holding-store",
+            "work-a",
+            &attempt.attempt_id,
+            "resume-late-1",
+            &interrupted.disposition_digest,
+            "adapter-process-resume-late-1",
+            &execution,
+            holding_time("2026-08-31T12:59:59Z"),
+        )
+        .unwrap();
+}
+
+#[test]
 fn holding_combines_abundant_fuel_with_exact_model_capacity_without_owner_overwrite() {
     let (
         _directory,
