@@ -1,0 +1,46 @@
+{
+  "authoring_provenance": {
+    "campaign_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "exact_work_id": "sha256:c938048c15ac6ebe40053d6137924cd60e75c649e4239b318901a5be77517ca6",
+    "maude_plan_ref": "sha256:3a47cadbb22352a36125c2079b03f4a4950f540ae9562dd024fc4517a7ab80b8",
+    "maude_session_id": "sess_0123456789ab",
+    "occurrence_id": "00000000-0000-4000-8000-000000000000",
+    "producer_component": "nightshift.canonical_runtime",
+    "proposal_id": "sha256:a09207c672b875eeee6ad4625bf984690b98c4658e314a1fd987bda46e15c92b",
+    "provenance_id": "sha256:45dbcd93e5e7cb1dd7e9a8ae12a1896005c900845a85634fff6791ba0f1e8605",
+    "recorded_at": "2026-07-27T20:00:10Z",
+    "schema": "nightshift.authoring_context_provenance.v1",
+    "source_intent_id": "sha256:3eb5a7bde39e8764c9b60451ad2d7813068db9ac963a2907a790a73fd11d4cd6",
+    "source_plan_bytes": 44
+  },
+  "campaign_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "cycle_id": "cycle:8adf1df2-dd19-43fc-9f94-42193d129ca7",
+  "lineage_export": {
+    "campaign_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "matches": [
+      {
+        "campaign_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "cycle_id": "cycle:8adf1df2-dd19-43fc-9f94-42193d129ca7",
+        "cycle_state_digest": "sha256:0e540c831b7b77cce0fdb6240d1d5ec1bb5e3b586314132ea114bae2e0f7105c",
+        "exact_work_id": "sha256:c938048c15ac6ebe40053d6137924cd60e75c649e4239b318901a5be77517ca6",
+        "lineage_id": "sha256:55a0886943f590c1f6ca519c28775f863ba5b8f27b6aacfe33330e078debc4d1",
+        "occurrence_id": "00000000-0000-4000-8000-000000000000",
+        "plan_document_ref": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+        "producer_component": "nightshift.canonical_store",
+        "proposal_id": "sha256:a09207c672b875eeee6ad4625bf984690b98c4658e314a1fd987bda46e15c92b",
+        "schema": "nightshift.precompiled_workflow_lineage.v1",
+        "source_cycle_request_digest": "sha256:da1278aabb4ef9c9da867162c4cf4c6f9f1aef0f7f9eebf10743b5203245c53e",
+        "source_cycle_request_id": "sha256:220b314290c6a558da78d25d1397ca06f5b0e96284a087dc42c78b50633e5635",
+        "source_intent_id": "sha256:3eb5a7bde39e8764c9b60451ad2d7813068db9ac963a2907a790a73fd11d4cd6"
+      }
+    ],
+    "occurrence_id": "00000000-0000-4000-8000-000000000000",
+    "schema": "nightshift.precompiled_workflow_lineage_export.v1"
+  },
+  "maude_plan_ref": "sha256:3a47cadbb22352a36125c2079b03f4a4950f540ae9562dd024fc4517a7ab80b8",
+  "maude_session_id": "sess_0123456789ab",
+  "occurrence_id": "00000000-0000-4000-8000-000000000000",
+  "proposal_id": "sha256:a09207c672b875eeee6ad4625bf984690b98c4658e314a1fd987bda46e15c92b",
+  "state_digest": "sha256:0e540c831b7b77cce0fdb6240d1d5ec1bb5e3b586314132ea114bae2e0f7105c",
+  "status": "awaiting_ag"
+}

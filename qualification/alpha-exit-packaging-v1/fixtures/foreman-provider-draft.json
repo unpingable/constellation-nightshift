@@ -1,0 +1,293 @@
+{
+  "admission": {
+    "admission_digest": "sha256:da6224362ab12bac22a2d9cbac642a3defb030eb28496e8f4e44e7161008c18a",
+    "admitted_at": "2026-08-31T12:00:00Z",
+    "allowed_adapter_ids": [
+      "switchyard-codex"
+    ],
+    "allowed_provider_model_classes": [
+      "large"
+    ],
+    "authority_effect": "LOCAL_AGENT_COMPUTE_SCHEDULING_ONLY",
+    "expires_at": "2026-08-31T13:00:00Z",
+    "local_runtime_identity": "runtime-fixture",
+    "maximum_concurrent_workers": 2,
+    "maximum_new_attempts_per_work_item": 1,
+    "operator_basis_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "packet_digest": "sha256:b229a4a42b9e39ee77004eb35fabfc0dac4de51cc6f43034e6f203d649374fb5",
+    "run_id": "run-holding-store",
+    "schema": "nightshift.foreman-admission/v1",
+    "target_effects_authorized": false
+  },
+  "packet": {
+    "authoring": {
+      "agent": "fixture",
+      "authority_basis": "local deterministic qualification",
+      "session": "fixture-session"
+    },
+    "canonicalization": {
+      "algorithm": "RFC8785-JCS",
+      "digest_algorithm": "SHA-256",
+      "digest_preimage": "domain prefix nightshift.orientation-packet.digest/v1 NUL, then packet object with packet_digest and switchyard.plan_ref omitted as RFC8785-JCS"
+    },
+    "created_at": "2026-08-31T12:00:00Z",
+    "current_until": "2026-08-31T14:00:00Z",
+    "global_constraints": {
+      "allowed_actions": [
+        "local scheduling"
+      ],
+      "forbidden_actions": [
+        "target actuation"
+      ],
+      "invariants": [
+        "scheduler state is not result state"
+      ]
+    },
+    "human_question_criteria": [
+      "exact operator authority missing"
+    ],
+    "packet_digest": "sha256:b229a4a42b9e39ee77004eb35fabfc0dac4de51cc6f43034e6f203d649374fb5",
+    "packet_id": "holding-store-fixture",
+    "repository_custody": [
+      {
+        "branch": "campaign/fixture",
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "discrepancy": null,
+        "path": "/tmp/nightshift-fixture",
+        "remote": null,
+        "remote_commit": null,
+        "repository": "nightshift",
+        "worktree_clean": true
+      }
+    ],
+    "schema": "nightshift.orientation-packet/v1",
+    "source_evidence": [
+      {
+        "branch": "campaign/fixture",
+        "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "file_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "path": "fixture",
+        "predecessor_classification": "EXACT-FIXTURE",
+        "repository": "nightshift"
+      }
+    ],
+    "switchyard": {
+      "alias": "fixture",
+      "plan_ref": "nightshift-packet://b229a4a42b9e39ee77004eb35fabfc0dac4de51cc6f43034e6f203d649374fb5",
+      "transport_fields": [
+        "alias",
+        "plan_ref",
+        "nonce"
+      ]
+    },
+    "work_items": [
+      {
+        "acceptance_tests": [
+          "exact receipt"
+        ],
+        "allowed_mutation_surfaces": [
+          "fixture"
+        ],
+        "campaign": {
+          "canonical_slug": "fixture-work-a",
+          "codename": "WORK-A"
+        },
+        "closeout_requirements": [
+          "clean local fixture"
+        ],
+        "dependencies": [],
+        "entry_predicates": [
+          "worker inspects exact predecessor evidence"
+        ],
+        "exact_work_refs": [
+          {
+            "branch": "campaign/fixture",
+            "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "contract_kind": "exact_work_proposal_v1",
+            "contract_schema": "ag.governed-loop.exact-work-proposal/v1",
+            "path": "proposal.json",
+            "proposal_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "repository": "fixture"
+          }
+        ],
+        "expected_receipts": [
+          "terminal or not-started"
+        ],
+        "forbidden_actions": [
+          "target actuation"
+        ],
+        "id": "work-a",
+        "model_routing": {
+          "class": "large",
+          "maximum_mutating_workers": 1,
+          "reason": "deterministic test"
+        },
+        "predecessor_lineage": [],
+        "stop_conditions": [
+          "entry predicate fails"
+        ],
+        "track": "fixture"
+      },
+      {
+        "acceptance_tests": [
+          "exact receipt"
+        ],
+        "allowed_mutation_surfaces": [
+          "fixture"
+        ],
+        "campaign": {
+          "canonical_slug": "fixture-work-b",
+          "codename": "WORK-B"
+        },
+        "closeout_requirements": [
+          "clean local fixture"
+        ],
+        "dependencies": [],
+        "entry_predicates": [
+          "worker inspects exact predecessor evidence"
+        ],
+        "exact_work_refs": [
+          {
+            "branch": "campaign/fixture",
+            "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "contract_kind": "exact_work_proposal_v1",
+            "contract_schema": "ag.governed-loop.exact-work-proposal/v1",
+            "path": "proposal.json",
+            "proposal_ref": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "repository": "fixture"
+          }
+        ],
+        "expected_receipts": [
+          "terminal or not-started"
+        ],
+        "forbidden_actions": [
+          "target actuation"
+        ],
+        "id": "work-b",
+        "model_routing": {
+          "class": "large",
+          "maximum_mutating_workers": 1,
+          "reason": "deterministic test"
+        },
+        "predecessor_lineage": [],
+        "stop_conditions": [
+          "entry predicate fails"
+        ],
+        "track": "fixture"
+      }
+    ],
+    "worker_budget": {
+      "maximum_concurrent_mutating_workers": 2,
+      "recursive_worker_swarms_forbidden": true,
+      "reserve_posture": "bounded fixture"
+    }
+  },
+  "policy": {
+    "allow_ordered_model_fallback": true,
+    "approval_response_authorized": false,
+    "authority_effect": "LOCAL_AGENT_COMPUTE_SCHEDULING_ONLY",
+    "automatic_semantic_retry": false,
+    "backoff_seconds": [
+      5,
+      10,
+      20,
+      40
+    ],
+    "maximum_dispatch_occurrences_per_attempt": 4,
+    "maximum_total_deferral_seconds": 600,
+    "parked_resource_lock_policy": "RELEASE_AND_REACQUIRE",
+    "policy_digest": "sha256:14520bfbbc15167cd283ef53cdd9e375b132cdbbbceefffec38ef1abf980add9",
+    "policy_id": "holding-policy",
+    "provider_capacity_released_while_parked": true,
+    "reconcile_indeterminate": true,
+    "schema": "nightshift.provider-execution-availability-policy/v1"
+  },
+  "profile": {
+    "adapter_timeout_seconds": 600,
+    "adapters": {
+      "switchyard-codex": {
+        "adapter_id": "switchyard-codex",
+        "adapter_version": "2.0.0",
+        "bounded_arguments": [],
+        "executable_identity": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+        "protocol": "switchyard.codex-app-server/v2"
+      }
+    },
+    "admission_digest": "sha256:da6224362ab12bac22a2d9cbac642a3defb030eb28496e8f4e44e7161008c18a",
+    "budget_policy_ref": "fuel-policy",
+    "closeout_policy": "ALL_EXPLICIT_TERMINAL_OR_NOT_STARTED",
+    "log_custody_root": "/tmp/nightshift-holding/log",
+    "maximum_event_bytes": 1048576,
+    "maximum_receipt_bytes": 1048576,
+    "packet_digest": "sha256:b229a4a42b9e39ee77004eb35fabfc0dac4de51cc6f43034e6f203d649374fb5",
+    "profile_digest": "sha256:aa30f4688f356b52e2a33455dc170665fb1c82532d1e9de15f8fe25e429c54c8",
+    "receipt_custody_root": "/tmp/nightshift-holding/receipts",
+    "schema": "nightshift.foreman-execution-profile/v2",
+    "work_items": {
+      "work-a": {
+        "adapter_id": "switchyard-codex",
+        "provider_model_class": "large",
+        "resource_lock_keys": [
+          "provider-slot-a"
+        ],
+        "workspace_identity": "workspace-work-a"
+      },
+      "work-b": {
+        "adapter_id": "switchyard-codex",
+        "provider_model_class": "large",
+        "resource_lock_keys": [
+          "provider-slot-b"
+        ],
+        "workspace_identity": "workspace-work-b"
+      }
+    }
+  },
+  "requirement": {
+    "adapter_executable_identity": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+    "adapter_id": "switchyard-codex",
+    "adapter_protocol": "switchyard.codex-app-server/v2",
+    "adapter_version": "2.0.0",
+    "admission_digest": "sha256:da6224362ab12bac22a2d9cbac642a3defb030eb28496e8f4e44e7161008c18a",
+    "admitted_at": "2026-08-31T12:00:00Z",
+    "authority_effect": "LOCAL_AGENT_COMPUTE_SCHEDULING_ONLY",
+    "owner_pins": {
+      "codex_owner_head": "c36a8137638decf8b04a49611354a90f32c5a945",
+      "deterministic_fixture_sha256": "sha256:cafa673ac58f60029fd6c1de229b4f57d9f42ba918b7ecb2a3bfb20cb2b41a31",
+      "switchyard_owner_head": "2ba25db66d8b29dd215bd87e05f4ea794024b3b7",
+      "switchyard_schema_sha256": "sha256:131f1f6e0cf8cb0aea26ed225c584440c81ffedd443c68ace23adecbe493cf93"
+    },
+    "packet_digest": "sha256:b229a4a42b9e39ee77004eb35fabfc0dac4de51cc6f43034e6f203d649374fb5",
+    "policy_digest": "sha256:14520bfbbc15167cd283ef53cdd9e375b132cdbbbceefffec38ef1abf980add9",
+    "policy_id": "holding-policy",
+    "profile_digest": "sha256:aa30f4688f356b52e2a33455dc170665fb1c82532d1e9de15f8fe25e429c54c8",
+    "requirement_digest": "sha256:23826153579dcdc7f5014ea399f41db0733d91c30f3b95ab890f525348f06a11",
+    "run_id": "run-holding-store",
+    "schema": "nightshift.foreman-execution-availability-requirement/v1",
+    "work_item_model_selections": {
+      "work-a": [
+        {
+          "model_class": "large",
+          "model_id": "gpt-5.6-sol",
+          "provider_id": "openai"
+        },
+        {
+          "model_class": "large",
+          "model_id": "gpt-5.6-terra",
+          "provider_id": "openai"
+        }
+      ],
+      "work-b": [
+        {
+          "model_class": "large",
+          "model_id": "gpt-5.6-sol",
+          "provider_id": "openai"
+        },
+        {
+          "model_class": "large",
+          "model_id": "gpt-5.6-terra",
+          "provider_id": "openai"
+        }
+      ]
+    }
+  }
+}

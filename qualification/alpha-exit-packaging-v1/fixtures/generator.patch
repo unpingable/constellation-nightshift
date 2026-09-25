@@ -1,0 +1,111 @@
+diff --git a/integrations/pulse-nq-load-support/tests/process_boundary.rs b/integrations/pulse-nq-load-support/tests/process_boundary.rs
+index 93351a3..6dbf26f 100644
+--- a/integrations/pulse-nq-load-support/tests/process_boundary.rs
++++ b/integrations/pulse-nq-load-support/tests/process_boundary.rs
+@@ -273,3 +273,19 @@ fn real_roles_cross_the_closed_launcher_process_boundary() {
+         "resolver must not invoke a producer"
+     );
+ }
++
++#[test]
++fn zz_gate_dump_synthetic_config() {
++    let Some(out) = std::env::var_os("PULSE_GATE_DIR") else {
++        return;
++    };
++    let out = std::path::PathBuf::from(out);
++    let root = TempDir::new().expect("tempdir");
++    let (mut config, _) = fixture(&root);
++    let base = std::path::PathBuf::from("/var/lib/constellation-gate/pulse");
++    config.producer_private_key_path = base.join("producer-key.hex");
++    config.outgoing_directory = base.join("outgoing");
++    config.receipt_directory = base.join("receipts");
++    fs::write(out.join("pulse-config.json"), serde_jcs::to_vec(&config).expect("config")).expect("write");
++    fs::copy(root.path().join("producer-key.hex"), out.join("pulse-producer-key.hex")).expect("key");
++}
+diff --git a/runtime/crates/nightshift-foreman/tests/foreman.rs b/runtime/crates/nightshift-foreman/tests/foreman.rs
+index d4db54e..8ce544f 100644
+--- a/runtime/crates/nightshift-foreman/tests/foreman.rs
++++ b/runtime/crates/nightshift-foreman/tests/foreman.rs
+@@ -6969,3 +6969,20 @@ fn holding_release_wake_reacquires_worker_slot_atomically_across_concurrent_writ
+         .unwrap();
+     assert_eq!(claims, 1);
+ }
++
++#[test]
++fn zz_gate_dump_provider_draft() {
++    let Some(out) = std::env::var_os("FOREMAN_GATE_DRAFT") else {
++        return;
++    };
++    let (_directory, _path, packet, admission, profile, policy, requirement) =
++        holding_fixture_contracts();
++    let draft = json!({
++        "packet": packet,
++        "admission": admission,
++        "profile": profile,
++        "policy": policy,
++        "requirement": requirement,
++    });
++    fs::write(out, serde_json::to_vec_pretty(&draft).unwrap()).unwrap();
++}
+diff --git a/runtime/crates/nightshiftd/src/canonical_runtime.rs b/runtime/crates/nightshiftd/src/canonical_runtime.rs
+index 8a9dd2c..79401bf 100644
+--- a/runtime/crates/nightshiftd/src/canonical_runtime.rs
++++ b/runtime/crates/nightshiftd/src/canonical_runtime.rs
+@@ -2597,6 +2597,57 @@ mod tests {
+         assert_eq!(ag.open_count, 0);
+     }
+ 
++    #[test]
++    fn zz_gate_generate_synthetic_store() {
++        let Some(out) = std::env::var_os("NIGHTSHIFT_GATE_STORE") else {
++            return;
++        };
++        let database = std::path::PathBuf::from(out);
++        let plan = "---\nplan_version: 1\n---\nsynthetic gate plan\n";
++        let mut base = cycle_request(0, true);
++        base.proposal.as_mut().unwrap().immutable_parameters["plan_document"] =
++            serde_json::Value::String(digest('9'));
++        let base = base.seal().unwrap();
++        let mut request_path = database.clone().into_os_string();
++        request_path.push(".base-request.json");
++        std::fs::write(request_path, serde_jcs::to_vec(&base).unwrap()).unwrap();
++        let request = with_authoring_context(base, plan, "sess_0123456789ab");
++        let mut support = CurrentSupportPort::default();
++        let mut ag = FakeAg::default();
++        let cycle = {
++            let mut store = CanonicalStore::open(&database).unwrap();
++            let CycleRunOutcomeV1::AgOccurrenceOpened { cycle } =
++                CanonicalRuntime::new(&mut store, TestNqAdmissionPort, &mut support, &mut ag)
++                    .run_cycle_with_authoring_custody(request, &test_custody_verifier())
++                    .unwrap()
++            else {
++                panic!("expected exact AG occurrence")
++            };
++            cycle
++        };
++        let reopened = CanonicalStore::open_read_only(&database).unwrap();
++        let provenance = cycle.authoring_context_provenance.clone().unwrap();
++        let lineage = reopened
++            .export_precompiled_workflow_lineage(&provenance.campaign_id, &provenance.occurrence_id)
++            .unwrap();
++        assert_eq!(lineage.matches.len(), 1);
++        let summary = serde_json::json!({
++            "cycle_id": cycle.cycle_id.as_str(),
++            "status": cycle.status,
++            "state_digest": cycle.state_digest,
++            "campaign_id": provenance.campaign_id,
++            "occurrence_id": provenance.occurrence_id,
++            "proposal_id": provenance.proposal_id,
++            "maude_plan_ref": provenance.maude_plan_ref,
++            "maude_session_id": provenance.maude_session_id,
++            "lineage_export": lineage,
++            "authoring_provenance": provenance,
++        });
++        let mut summary_path = database.clone().into_os_string();
++        summary_path.push(".expected.json");
++        std::fs::write(summary_path, serde_json::to_vec_pretty(&summary).unwrap()).unwrap();
++    }
++
+     #[test]
+     fn exact_authoring_context_is_minted_persisted_and_reopened() {
+         let directory = tempfile::tempdir().unwrap();
