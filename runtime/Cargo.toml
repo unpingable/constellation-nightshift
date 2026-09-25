@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/nightshiftd",
+    "crates/nightshift-build-info",
     "crates/nightshift-casework",
     "crates/nightshift-foreman",
     "crates/nightshift-provider-capacity",

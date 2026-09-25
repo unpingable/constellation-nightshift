@@ -23,6 +23,7 @@ mod provider_cli_inputs;
 #[derive(Parser)]
 #[command(
     name = "nightshift-foreman",
+    version = nightshift_build_info::VERSION_STRING,
     about = "Durable non-authorizing local agent-compute scheduler"
 )]
 struct Cli {
@@ -280,6 +281,9 @@ enum Command {
 }
 
 fn main() -> Result<()> {
+    if nightshift_build_info::write_if_requested("nightshift-foreman")? {
+        return Ok(());
+    }
     let cli = Cli::parse();
     match cli.command {
         Command::TerminalReceipt {

@@ -16,6 +16,7 @@ name = "nightshift-foreman"
 path = "src/bin/nightshift_foreman.rs"
 
 [dependencies]
+nightshift-build-info = { path = "../nightshift-build-info" }
 anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true

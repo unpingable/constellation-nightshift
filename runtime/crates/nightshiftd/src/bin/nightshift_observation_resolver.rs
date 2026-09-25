@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Parser)]
 #[command(
     name = "nightshift-observation-resolver",
-    version,
+    version = nightshift_build_info::VERSION_STRING,
     about = "Read-only Nightshift observation-evidence resolver for AG"
 )]
 struct Arguments {
@@ -73,6 +73,9 @@ struct ReservationQualificationResolverBindingV1 {
     source: AgOccurrenceReferenceV1,
 }
 fn main() -> anyhow::Result<()> {
+    if nightshift_build_info::write_if_requested("nightshift-observation-resolver")? {
+        return Ok(());
+    }
     let arguments = Arguments::parse();
     let mut input = String::new();
     std::io::stdin()

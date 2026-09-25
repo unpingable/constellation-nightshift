@@ -474,6 +474,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
+name = "nightshift-build-info"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nightshift-casework"
 version = "0.1.0"
 dependencies = [
@@ -502,6 +510,7 @@ dependencies = [
  "clap",
  "hex",
  "libc",
+ "nightshift-build-info",
  "nightshift-casework",
  "nightshift-provider-capacity",
  "nightshiftd",
@@ -541,6 +550,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "libc",
+ "nightshift-build-info",
  "rusqlite",
  "serde",
  "serde_jcs",

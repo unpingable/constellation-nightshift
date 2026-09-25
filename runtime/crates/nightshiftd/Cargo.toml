@@ -24,6 +24,7 @@ name = "nightshiftd"
 path = "src/lib.rs"
 
 [dependencies]
+nightshift-build-info = { path = "../nightshift-build-info" }
 anyhow.workspace = true
 thiserror.workspace = true
 clap.workspace = true
