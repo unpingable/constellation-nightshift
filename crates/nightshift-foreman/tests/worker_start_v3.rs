@@ -19,6 +19,7 @@ type V3Substitution = Box<dyn Fn(&mut WorkerStartRequestV3)>;
 
 #[test]
 fn explicit_beta_owner_tuple_preserves_requirement_binding_without_fallback() {
+    check_candidate_tuple(ProviderAdmissionOwnerPinsV1::retained_provider_receipt_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::filtered_raw_completion_echo_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::raw_completion_echo_candidate());
     check_candidate_tuple(ProviderAdmissionOwnerPinsV1::bounded_turn_echo_candidate());
@@ -46,6 +47,53 @@ fn explicit_beta_owner_tuple_preserves_requirement_binding_without_fallback() {
     hybrid.switchyard_schema_sha256 =
         ProviderAdmissionOwnerPinsV1::beta_candidate().switchyard_schema_sha256;
     assert!(hybrid.validate().is_err());
+}
+
+#[test]
+fn terminal_receipt_bridge_tuple_is_exact_and_hybrids_refuse() {
+    let pins = ProviderAdmissionOwnerPinsV1::retained_provider_receipt_candidate();
+    assert_eq!(
+        pins.switchyard_owner_head,
+        "0d5c87e792bb0e8ea787329f25b0e31cc9dfd0b6"
+    );
+    assert_eq!(
+        pins.codex_owner_head,
+        "97b0acd5ce2ccb3c87a763606696c35a450947f6"
+    );
+    assert_eq!(
+        pins.switchyard_schema_sha256,
+        "sha256:c851fb5dd157ebb70896da06db50a07b968b3c0d357b2defc73ca267b9d82f93"
+    );
+    assert_eq!(
+        pins.deterministic_fixture_sha256,
+        "sha256:cafa673ac58f60029fd6c1de229b4f57d9f42ba918b7ecb2a3bfb20cb2b41a31"
+    );
+    check_candidate_tuple(pins.clone());
+
+    let prior = ProviderAdmissionOwnerPinsV1::filtered_raw_completion_echo_candidate();
+    assert_eq!(
+        prior.switchyard_owner_head,
+        "299609cda100ccf8701d5619ac78499f8bddd303"
+    );
+    prior.validate().unwrap();
+
+    for mutate in [
+        |value: &mut ProviderAdmissionOwnerPinsV1| {
+            value.codex_owner_head = ProviderAdmissionOwnerPinsV1::accepted().codex_owner_head;
+        },
+        |value: &mut ProviderAdmissionOwnerPinsV1| {
+            value.switchyard_schema_sha256 =
+                ProviderAdmissionOwnerPinsV1::bounded_turn_candidate().switchyard_schema_sha256;
+        },
+        |value: &mut ProviderAdmissionOwnerPinsV1| {
+            value.deterministic_fixture_sha256 = digest('e');
+        },
+    ] as [fn(&mut ProviderAdmissionOwnerPinsV1); 3]
+    {
+        let mut hybrid = pins.clone();
+        mutate(&mut hybrid);
+        assert!(hybrid.validate().is_err());
+    }
 }
 
 #[test]
