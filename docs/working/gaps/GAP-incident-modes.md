@@ -23,7 +23,7 @@ and a different class of risk. Mashing them produces:
 - forgotten rollout debt
 - victory essays
 
-Traditional NOC / incident-management practice solved this with
+Traditional operations and incident-management practice solved this with
 phase discipline. The load-bearing principles:
 
 > Closing the incident is not the same as closing the architectural
@@ -176,10 +176,10 @@ Reconciler behavior for `protected`:
 
 This is the "don't casually turn this off" bit, explicitly named.
 
-## NOC coordination primitives
+## Operations coordination primitives
 
 Parallel-ops (`GAP-parallel-ops.md`) covers the substrate.
-Incident-mode work layers on the primitives NOC practice has carried
+Incident-mode work layers on the primitives operations practice has carried
 for decades:
 
 ```text

@@ -32,7 +32,7 @@ the scope, and nobody told us.*
 The failure mode this doc exists to prevent is not *forgetting*. It
 is *failing to ritualize recall*.
 
-Every NOC figured this out: channels, bridge notes, shift handoffs,
+Every operations team figured this out: channels, bridge notes, shift handoffs,
 incident commander handoffs. Those primitives existed because without
 them, locally-rational actors manufacture global incoherence.
 

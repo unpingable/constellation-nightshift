@@ -17,7 +17,7 @@ each tool inventing its own dispatch logic — the constellation grows
 several almost-agreeing routers and a permanent class of "this event
 should have gone to X, but Y consumed it instead" failures.
 
-That class of failure is what NOC practice calls *routing by vibes*:
+That class of failure is what operations practice calls *routing by vibes*:
 
 > "This smells like Night Shift."
 > "This feels like Governor."
