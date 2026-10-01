@@ -1,0 +1,5 @@
+#!/bin/sh
+# Purge retains /etc/nightshift, /var/lib/nightshift and the nightshift account.
+set -eu
+if [ -d /run/systemd/system ]; then systemctl daemon-reload || true; fi
+exit 0

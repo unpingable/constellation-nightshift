@@ -1,0 +1,8 @@
+#!/bin/sh
+# Stops the timer and any running cycle before upgrade or removal; leaves them stopped.
+set -eu
+if [ -d /run/systemd/system ]; then
+    systemctl stop nightshift-observation-cycle.timer nightshift-observation-cycle.service || exit 1
+    case "${1:-}" in remove) systemctl disable nightshift-observation-cycle.timer || true ;; esac
+fi
+exit 0

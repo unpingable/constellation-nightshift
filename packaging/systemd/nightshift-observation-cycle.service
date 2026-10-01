@@ -1,0 +1,54 @@
+[Unit]
+Description=Nightshift canonical observation cycle
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/nightshift/observation-cycle.env
+
+# Refuse Debian's unrelated `nq` executable and pre-producer NQ-NG builds
+# before a recurrence attempt reaches the evidence-admission call.
+ExecStartPre=/usr/bin/env ${NIGHTSHIFT_NQ_PROGRAM} --help
+ExecStartPre=/usr/bin/env ${NIGHTSHIFT_NQ_PROGRAM} diagnostics qualify --help
+
+# The recurrence timer permits one observation attempt only. The request binds
+# the exact recurrence slot, complete diagnostic basis, and optional immutable
+# AG proposal. Empty NIGHTSHIFT_AG_FLAGS is valid for posture-only cycles.
+ExecStart=/usr/bin/nightshift \
+    --store ${NIGHTSHIFT_STORE} \
+    cycle run \
+    --request ${NIGHTSHIFT_CYCLE_REQUEST} \
+    --nq-program ${NIGHTSHIFT_NQ_PROGRAM} \
+    --nq-config ${NIGHTSHIFT_NQ_CONFIG} \
+    --nq-source-id ${NIGHTSHIFT_NQ_SOURCE_ID} \
+    --present-evidence-resolver ${NIGHTSHIFT_PRESENT_EVIDENCE_RESOLVER} \
+    $NIGHTSHIFT_CONTINUITY_FLAGS \
+    $NIGHTSHIFT_SUBSTRATE_ORIGIN_FLAGS \
+    $NIGHTSHIFT_AG_FLAGS
+
+StandardOutput=journal
+StandardError=journal
+
+User=nightshift
+Group=nightshift
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/nightshift
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+TimeoutStartSec=120s

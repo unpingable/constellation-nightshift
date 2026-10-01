@@ -1,0 +1,13 @@
+#!/bin/sh
+# Creates account and layout only. Never writes the environment file, a cycle
+# request, enables the timer or starts a cycle.
+set -eu
+getent group nightshift >/dev/null 2>&1 || addgroup --system nightshift
+if ! getent passwd nightshift >/dev/null 2>&1; then
+    shell=/usr/sbin/nologin; [ -x "$shell" ] || shell=/bin/false
+    adduser --system --ingroup nightshift --home /var/lib/nightshift --no-create-home --shell "$shell" nightshift
+fi
+install -d -o root -g nightshift -m 0750 /etc/nightshift /etc/nightshift/cycles
+install -d -o nightshift -g nightshift -m 0750 /var/lib/nightshift
+if [ -d /run/systemd/system ]; then systemctl daemon-reload || true; fi
+exit 0

@@ -1,0 +1,15 @@
+Package: constellation-nightshift
+Version: @VERSION@
+Section: admin
+Priority: optional
+Architecture: @ARCH@
+Maintainer: Constellation contributors
+Depends: libc6, adduser
+Recommends: nq-ng
+Description: Nightshift recurrence, applicability and observation-cycle runtime
+ Installs the nightshift and nightshift-observation-resolver executables, the
+ canonical observation-cycle unit and timer, and the site environment example.
+ Installation creates the nightshift account and layout only; the site
+ environment file, cycle request, timer enablement and start are explicit
+ operator steps. The packaged unit differs from deploy/systemd only in the
+ executable path (/usr/bin instead of /usr/local/bin).
