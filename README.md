@@ -1,5 +1,8 @@
 # Nightshift
 
+Start with the [component guide](docs/PUBLIC_GUIDE.md) for installation
+prerequisites, supported observation paths, trust boundaries, and recovery.
+
 Nightshift is the durable temporal observation and attention office.
 
 It decides when to look again, consumes qualified present support and complete

@@ -115,13 +115,6 @@ docs/
 - The canonical authority office for governed work is AG ng; there is no
   production classic-Governor integration in this crate
 
-Scoped source/test classic retirement was independently closed at the recorded
-CLASSIC-RETIREMENT revisions; installed/fleet state was not established. The
-historical inventory and current return are in
-`docs/working/gaps/GAP-classic-retirement.md`. Do not introduce new classic
-dependencies or automatic fallback; historical qualification is not modern
-replacement acceptance.
-
 ---
 
 ## Invariants
@@ -170,3 +163,18 @@ Ask for clarification rather than guessing, especially around:
 | Claude Code | `CLAUDE.md` | Full operational context, build details, conventions |
 | Codex | `AGENTS.md` (this file) | Operating context + defaults |
 | Any future agent | `AGENTS.md` (this file) | Start here |
+
+## Campaign selection
+
+Use Nightshift when recurrence, currentness, durable observation history, or
+restart-safe proposal tracking matters; keep bounded edits on the ordinary
+workflow. Inspect `cargo run --bin nightshift -- --help` and follow
+`docs/CANONICAL_RUNTIME_C1.md`; composed runs require exact owner-approved NQ,
+present-support, AG, and Docket coordinates for the supported revision.
+
+For prolonged work, use the campaign-approved durable producer and checkpoint;
+user-systemd is one option only when that campaign records it. After supervisor
+loss, inspect the original cycle and owning AG/Docket occurrence, then reconcile
+before requesting successor work. Tool availability, recurrence, or a proposal
+grants no authority. If the composed path is unavailable, use the documented
+fallback and state the evidence limit. Pre-alpha design flow remains opt-in.
