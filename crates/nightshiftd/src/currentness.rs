@@ -363,9 +363,12 @@ pub struct CommandPresentEvidencePortV1 {
 impl CommandPresentEvidencePortV1 {
     pub fn new(program: impl Into<PathBuf>) -> Result<Self, String> {
         let program = program.into();
-        if program.file_name().and_then(|name| name.to_str()) != Some("pulse-support-resolver") {
+        if !matches!(
+            program.file_name().and_then(|name| name.to_str()),
+            Some("pulse-support-resolver" | "pulse-m2-support-resolver")
+        ) {
             return Err(
-                "present-evidence adapter accepts only the pulse-support-resolver executable"
+                "present-evidence adapter accepts only a closed Pulse support resolver executable"
                     .into(),
             );
         }
@@ -553,5 +556,28 @@ mod tests {
     fn command_adapter_rejects_an_arbitrary_executable() {
         assert!(CommandPresentEvidencePortV1::new("sh").is_err());
         assert!(CommandPresentEvidencePortV1::new("pulse-support-resolver").is_ok());
+        assert!(CommandPresentEvidencePortV1::new("pulse-m2-support-resolver").is_ok());
+    }
+    #[test]
+    fn shared_m2_support_vector_validates_and_refuses_substitution() {
+        let v: serde_json::Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/m2-qualified-support-v1.json"
+        ))
+        .unwrap();
+        let q: PresentEvidenceQueryV1 = serde_json::from_value(v["query"].clone()).unwrap();
+        let a: QualifiedSupportV1 = serde_json::from_value(v["answer"].clone()).unwrap();
+        a.validate_for(&q).unwrap();
+        let mut other = q.clone();
+        other.request_nonce = "different-nonce".into();
+        other.query_id = object_id(&other, "query_id").unwrap();
+        assert!(a.validate_for(&other).is_err());
+        let mut other = a.clone();
+        other.expiry.as_mut().unwrap().clock_id = "other-boot".into();
+        other.support_id = other.computed_support_id().unwrap();
+        assert!(other.validate_for(&q).is_err());
+        let mut other = a;
+        other.expiry.as_mut().unwrap().tick = other.evaluated_at.tick;
+        other.support_id = other.computed_support_id().unwrap();
+        assert!(other.validate_for(&q).is_err());
     }
 }
