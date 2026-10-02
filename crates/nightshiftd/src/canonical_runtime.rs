@@ -77,11 +77,17 @@ pub fn ag_executor_plan_identity(plan: &serde_json::Value) -> Result<String, Str
     if !plan.is_object() {
         return Err("AG executor plan must be an exact typed object".into());
     }
+    let domain = match plan.get("schema").and_then(serde_json::Value::as_str) {
+        // Retained identity inspection only; AG refuses V1 production execution.
+        Some(AG_EXECUTOR_PLAN_IDENTITY_DOMAIN_V1) => AG_EXECUTOR_PLAN_IDENTITY_DOMAIN_V1,
+        Some("ag-effectd.docket-executor-plan/v2") => "ag-effectd.docket-executor-plan/v2",
+        Some("ag-effectd.docket-executor-systemd-plan/v2") => {
+            "ag-effectd.docket-executor-systemd-plan/v2"
+        }
+        _ => return Err("missing or unknown AG executor plan schema".into()),
+    };
     let canonical = serde_jcs::to_vec(plan).map_err(|error| error.to_string())?;
-    Ok(ag_hash_domain(
-        AG_EXECUTOR_PLAN_IDENTITY_DOMAIN_V1,
-        &canonical,
-    ))
+    Ok(ag_hash_domain(domain, &canonical))
 }
 
 fn require_token(name: &str, value: &str) -> Result<(), String> {
@@ -3587,6 +3593,23 @@ mod tests {
             expected_ag_work,
             ag_executor_plan_identity(&changed.ag_executor_plan).unwrap()
         );
+    }
+
+    #[test]
+    fn current_systemd_plan_identity_matches_shared_ag_vector() {
+        let vector: serde_json::Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/systemd-plan-identity-v2.json"
+        ))
+        .unwrap();
+        assert_eq!(
+            ag_executor_plan_identity(&vector["plan"]).unwrap(),
+            vector["identity"].as_str().unwrap()
+        );
+        let mut plan = vector["plan"].clone();
+        plan.as_object_mut().unwrap().remove("schema");
+        assert!(ag_executor_plan_identity(&plan).is_err());
+        plan["schema"] = serde_json::json!("unknown/v2");
+        assert!(ag_executor_plan_identity(&plan).is_err());
     }
 
     #[test]

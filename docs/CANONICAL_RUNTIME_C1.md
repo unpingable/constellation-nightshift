@@ -114,7 +114,13 @@ Nightshift and AG intentionally use different work-identity domains:
   It is sealed into `TypedCoarseIntentV2.compiled_work` as provenance.
 - The AG/Docket-domain executable-work identity is the identity of the exact
   executor plan, derived with AG's domain-separated digest
-  (`hash_domain("ag-effectd.docket-executor-plan/v1", JCS(plan))`).
+  (`hash_domain(plan.schema, JCS(plan))`). Current production schemas are
+  `ag-effectd.docket-executor-plan/v2` and
+  `ag-effectd.docket-executor-systemd-plan/v2`; missing/unknown schemas are
+  refused. The existing V1 identity remains readable for retained records,
+  while AG refuses V1 production execution. No legacy execution route is
+  added. The current Systemd vector is shared byte-for-byte with AG in
+  `crates/nightshiftd/tests/fixtures/systemd-plan-identity-v2.json`.
 
 The two digest values need not be equal, because they identify different
 semantic objects. Safety comes from the sealed cross-domain binding, not
