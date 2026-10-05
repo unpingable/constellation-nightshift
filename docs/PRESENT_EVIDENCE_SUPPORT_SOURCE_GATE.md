@@ -55,7 +55,7 @@ reliance decision.
 The dormant observation office has one admitted NQ V3 acquisition:
 
 ```text
-subject:     host:labelwatch-host
+subject:     host:reference-node
 question:    nq.host.load_pressure/v1
 artifact:    sha256:54c50dfca0acfaf369d7e800d585b35a26768ffefbad5741cea62c04b63bfad3
 claim:       bounded condition host_load_pressure is explicitly absent
