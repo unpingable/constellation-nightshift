@@ -1,5 +1,16 @@
 # Nightshift
 
+## Current operator candidate
+
+The prepared combined candidate targets Ubuntu 22.04 amd64. Use its source-free
+[operator guide](https://github.com/unpingable/unpingable-site/blob/dev/operator-beta/constellation/combined-candidate/README.md) for download verification, exact package installation,
+separate enrollment, Workbench, currentness and day-two recovery. It is a neutral
+owner-review candidate; BC1 is not tagged or published. Component source alone
+does not install the composed product or grant authority.
+
+The component-specific development and historical records below retain their
+own narrower scope; they are not installation instructions for this candidate.
+
 Start with the [component guide](docs/PUBLIC_GUIDE.md) for installation
 prerequisites, supported observation paths, trust boundaries, and recovery.
 
@@ -38,8 +49,9 @@ exact recurrence slot
   -> fresh observation required, reconciliation display, halt display, or close
 ```
 
-This runtime has development and hostile-test evidence. It is not yet an
-operational qualification claim.
+The bounded reference runtime is operationally qualified in the accepted
+spine. Development/negative-case records below remain component-local evidence;
+they do not qualify arbitrary deployments.
 
 The former Watchbill, Wicket/WLP, MVP-A, classic Governor, authority ladder,
 prose action, same-generation skip, and production drill paths have been
