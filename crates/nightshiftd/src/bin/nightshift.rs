@@ -67,7 +67,8 @@ const MAX_EXACT_INPUT_BYTES: u64 = 16 * 1024 * 1024;
 #[derive(Debug, Parser)]
 #[command(
     name = "nightshift",
-    version,
+    version = nightshiftd::build_info::VERSION_STRING,
+    after_help = "Use --build-info as the sole argument for machine-readable build identity.",
     about = "Canonical temporal observation and attention office"
 )]
 struct Arguments {
@@ -589,6 +590,9 @@ impl NqAdmissionPortV1 for NoNqAdmissionPort {
 }
 
 fn main() -> anyhow::Result<()> {
+    if nightshiftd::build_info::write_if_requested("nightshift")? {
+        return Ok(());
+    }
     let arguments = Arguments::parse();
     match arguments.command {
         Command::Cycle { command } => run_cycle_command(&arguments.store, command),
