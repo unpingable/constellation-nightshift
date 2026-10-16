@@ -5,6 +5,11 @@
 //! attention, and submits immutable exact-work proposals to AG. It has no
 //! standing, authorization, execution-custody, effect, or AG-continuation API.
 
+pub mod build_info;
+
+#[cfg(test)]
+mod build_identity_input;
+
 pub mod ag_port;
 pub mod authoring_context;
 pub mod authoring_custody;
