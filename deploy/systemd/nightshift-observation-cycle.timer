@@ -2,12 +2,12 @@
 Description=Nightshift canonical observation-cycle timer
 
 [Timer]
-# Preserve the existing invocation cadence, boot delay, jitter, and catch-up
-# policy. Slot identity and overlap exclusion are enforced by Nightshift's
-# canonical transactional store; diagnostic generation is irrelevant.
-OnBootSec=2min
-OnUnitActiveSec=5min
-RandomizedDelaySec=30s
+# Default request slots use a UTC five-minute grid. Match the site's epoch
+# and cadence with an OnCalendar override when its request policy differs.
+# Slot admission and overlap exclusion remain canonical-store decisions.
+OnCalendar=*-*-* *:00/5:00 UTC
+AccuracySec=5s
+RandomizedDelaySec=0
 Unit=nightshift-observation-cycle.service
 Persistent=true
 

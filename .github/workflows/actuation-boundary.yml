@@ -28,6 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify packaged timer recurrence
+        run: python3 -B -m unittest discover -s packaging -p test_timer_schedule.py -v
+
       - name: Run the guard against the working tree
         run: |
           chmod +x scripts/check_no_actuation_surface.sh
