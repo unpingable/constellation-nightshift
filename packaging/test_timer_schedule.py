@@ -24,12 +24,14 @@ EPOCH = dt.datetime(2026, 10, 1, tzinfo=UTC)
 def calendar_events(expression, base, timezone):
     output = subprocess.check_output(
         ["systemd-analyze", "calendar", "--iterations=24",
-         "--base-time=" + base.isoformat(), expression],
+         # systemd 249 (Ubuntu 22.04) accepts the explicit UTC form, while
+         # rejecting the ISO 8601 offset form accepted by newer releases.
+         "--base-time=" + base.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"), expression],
         env={**os.environ, "TZ": timezone, "LC_ALL": "C"}, text=True,
     )
     return [dt.datetime.fromisoformat(value).replace(tzinfo=UTC)
             for value in re.findall(
-                r"(?:Next elapse:|Iteration #\d+:|\(in UTC\):)\s+\w+ "
+                r"(?:Next elapse:|Iter(?:ation|\.) #\d+:|\(in UTC\):)\s+\w+ "
                 r"(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) UTC", output)]
 
 
