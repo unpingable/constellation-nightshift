@@ -63,6 +63,20 @@ producer execution is explicitly enrolled with `--allow-exec` and remains
 constrained by Monitor's own bounds; it is not described as read-only merely
 because the later NQ query is read-only.
 
+The production structural gate admits this module as a distinct acquisition
+port, alongside the six existing process modules. Its source checks retain
+the exact enrolled Monitor collection argument vector and NQ
+`inspect|result|evaluate|condition` vectors, executable/configuration digest
+capture into sealed descriptors, one production spawn and two role callers,
+the 1–300 second deadline, bounded output files and process-group cleanup.
+The terminal test module is checked separately from field-level `cfg(test)`;
+neither a new production module nor code after the tests is implicitly exempt.
+`python3 -B -m unittest discover -s scripts -p test_qualification_replay_ports.py -v`
+exercises accepting source and direct refusal specimens in the existing CI
+gate. These are conservative source-shape checks, not a Rust parser or native
+qualification. New source forms require explicit gate review. This adds no
+runtime role, execution permission or installed saved-check deployment claim.
+
 The command durably opens one evaluation before collection, retains the exact
 Monitor inventory and selected concern's `observation.observed_at`, and keeps
 the separate acquisition time. It then verifies NQ's installed definition and

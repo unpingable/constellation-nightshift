@@ -39,3 +39,6 @@ jobs:
       - name: Verify the guard catches injected violations
         run: |
           ./scripts/check_no_actuation_surface.sh --self-test-inject
+
+      - name: Verify replay and acquisition port refusal controls
+        run: python3 -B -m unittest discover -s scripts -p test_qualification_replay_ports.py -v

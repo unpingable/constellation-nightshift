@@ -49,6 +49,18 @@ The production executable surface is two binaries:
 The structural exclusivity gate
 (`scripts/check_no_actuation_surface.sh`) enforces this closed graph.
 
+The same CLI also owns the separately enrolled
+[`saved-check run` acquisition/evaluation port](SAVED-CHECK-RECURRENCE.md#durable-local-evaluation-owner).
+It invokes Monitor `collect --allow-exec` and the four NQ `saved-check`
+operations `inspect`, `result`, `evaluate`, and `condition`; it is not one of
+the read-only replay ports. The structural inventory names its one production
+process module separately. The source-shape checker restricts the two enrolled
+role callers, their argument vectors, sealed executable/configuration handoff,
+process-group cleanup and execution/output bounds. It does not establish that
+an arbitrary enrolled Monitor producer is non-actuating, that a deployment is
+admitted, or that runtime qualification occurred. The existing saved-check
+enrollment and Monitor execution constraints still apply.
+
 ### NQ-NG admission provenance boundary
 
 Before a non-missed cycle claims its recurrence slot, every delivered

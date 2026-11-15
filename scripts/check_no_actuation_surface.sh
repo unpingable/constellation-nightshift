@@ -193,8 +193,10 @@ fi
 
 # The only process boundaries are exact, closed ports: read-only NQ admission
 # qualification, present-support resolution, exact Pulse receipt replay,
-# exact NQ repository-qualification replay, exact NQ reservation-realization replay, and AG occurrence opening/status.
-# Any seventh site is a new runtime authority or
+# exact NQ repository-qualification replay, exact NQ reservation-realization replay,
+# AG occurrence opening/status, and the separately enrolled saved-check
+# acquisition/evaluation adapter. The last is NOT read-only replay.
+# Any eighth production module is a new runtime authority or
 # execution surface and fails closed.
 mapfile -t command_files < <(rg -l 'Command::new' "$production_src" | sort)
 expected_command_files=(
@@ -204,6 +206,7 @@ expected_command_files=(
     crates/nightshiftd/src/project_predicate_attention.rs
     crates/nightshiftd/src/repository_qualification.rs
     crates/nightshiftd/src/reservation_qualification.rs
+    crates/nightshiftd/src/saved_check_runtime.rs
 )
 if [ "${command_files[*]}" != "${expected_command_files[*]}" ]; then
     fail "production subprocess files are not the exact closed port set: ${command_files[*]:-<none>}"
@@ -227,9 +230,10 @@ if [ "$(rg -c 'Command::new' crates/nightshiftd/src/reservation_qualification.rs
     fail "reservation-realization ingress must contain exactly one subprocess site"
 fi
 # Preserve both the exact site count and retirement's whole command-chain
-# checks for the modern NQ-ng replay consumers. Neither alone is qualification.
+# checks for the modern NQ-ng replay consumers and the separate saved-check
+# acquisition role/argv/sealed-input/bounds check. Neither is qualification.
 if ! python3 scripts/check_qualification_replay_ports.py; then
-    fail "qualification replay port widened beyond its exact read-only command"
+    fail "replay or saved-check acquisition port widened beyond its closed contract"
 fi
 if ! rg -q 'Some\("ag-loopctl"\)' crates/nightshiftd/src/ag_port.rs; then
     fail "AG port is not executable-name pinned to ag-loopctl"
