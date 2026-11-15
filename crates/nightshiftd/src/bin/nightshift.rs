@@ -417,8 +417,11 @@ enum CycleCommand {
         observed_at: String,
     },
     Show {
-        #[arg(long)]
-        cycle_id: String,
+        #[arg(long, required_unless_present = "slot_id", conflicts_with = "slot_id")]
+        cycle_id: Option<String>,
+        /// Exact retained cycle for this slot, without a latest-family scan.
+        #[arg(long, required_unless_present = "cycle_id")]
+        slot_id: Option<String>,
         #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
         format: OutputFormat,
     },
@@ -1363,9 +1366,17 @@ fn run_cycle_command(store_path: &Path, command: CycleCommand) -> anyhow::Result
                     .map_err(anyhow::Error::msg)?;
             write_exact(&store.record_ag_refusal(&id, &cycle.state_digest, refusal, now)?)
         }
-        CycleCommand::Show { cycle_id, format } => {
-            let store = CanonicalStore::open(store_path)?;
-            let cycle = store.get_cycle(&ObservationCycleId::parse(cycle_id)?)?;
+        CycleCommand::Show {
+            cycle_id,
+            slot_id,
+            format,
+        } => {
+            let store = CanonicalStore::open_read_only(store_path)?;
+            let cycle = match (cycle_id, slot_id) {
+                (Some(id), None) => store.get_cycle(&ObservationCycleId::parse(id)?)?,
+                (None, Some(id)) => store.get_cycle_for_slot(&id)?,
+                _ => bail!("select exactly one of --cycle-id or --slot-id"),
+            };
             match format {
                 OutputFormat::Json => write_exact(&cycle),
                 OutputFormat::Text => render_cycle_text(&cycle),

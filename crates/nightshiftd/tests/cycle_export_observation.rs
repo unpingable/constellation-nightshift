@@ -245,6 +245,106 @@ fn export_observation_reports_absent_as_zero_matches() {
 }
 
 #[test]
+fn show_exact_slot_returns_the_native_record_without_latest_lineage() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("ns.sqlite");
+    let request = posture_only_request(&digest('a'));
+    let slot_id = request.slot.slot_id.as_str().to_owned();
+    let mut store = CanonicalStore::open(&database).unwrap();
+    let mut support = CurrentSupportPort;
+    let mut ag = NoAgPort;
+    let outcome = CanonicalRuntime::new(&mut store, TestNqAdmissionPort, &mut support, &mut ag)
+        .run_cycle(request)
+        .unwrap();
+    let CycleRunOutcomeV1::PostureOnly { cycle } = outcome else {
+        panic!("expected a posture-only cycle")
+    };
+    drop(store);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_nightshift"))
+        .args([
+            "--store",
+            database.to_str().unwrap(),
+            "cycle",
+            "show",
+            "--slot-id",
+            &slot_id,
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let shown: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(shown, serde_json::to_value(&cycle).unwrap());
+    assert_eq!(
+        CanonicalStore::open(&database)
+            .unwrap()
+            .get_cycle(&cycle.cycle_id)
+            .unwrap(),
+        cycle
+    );
+
+    for selectors in [
+        vec![],
+        vec![
+            "--slot-id",
+            slot_id.as_str(),
+            "--cycle-id",
+            cycle.cycle_id.as_str(),
+        ],
+        vec!["--slot-id", "invalid-slot"],
+        vec!["--slot-id", &digest('b')],
+    ] {
+        let refused = Command::new(env!("CARGO_BIN_EXE_nightshift"))
+            .args(["--store", database.to_str().unwrap(), "cycle", "show"])
+            .args(selectors)
+            .output()
+            .unwrap();
+        assert!(!refused.status.success());
+        assert!(refused.stdout.is_empty());
+    }
+}
+
+#[test]
+fn show_exact_slot_preserves_an_attempt_with_no_observation() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("ns.sqlite");
+    let request = posture_only_request(&digest('c'));
+    let slot_id = request.slot.slot_id.as_str().to_owned();
+    let mut store = CanonicalStore::open(&database).unwrap();
+    let (cycle, _) = store
+        .claim_slot(
+            request.slot,
+            &request.scheduler_clock_id,
+            request.evaluated_at,
+        )
+        .unwrap();
+    drop(store);
+    let output = Command::new(env!("CARGO_BIN_EXE_nightshift"))
+        .args([
+            "--store",
+            database.to_str().unwrap(),
+            "cycle",
+            "show",
+            "--slot-id",
+            &slot_id,
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let shown: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(shown, serde_json::to_value(&cycle).unwrap());
+    assert!(shown["observation"].is_null());
+}
+
+#[test]
 fn export_observation_does_not_mutate_runtime_state() {
     let directory = tempfile::tempdir().unwrap();
     let database = directory.path().join("ns.sqlite");

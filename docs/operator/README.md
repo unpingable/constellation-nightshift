@@ -135,12 +135,19 @@ absent. The full transport, replay, restart, and environmental contract is in
 ```sh
 nightshift --store /var/lib/nightshift/nightshift.sqlite cycle list
 nightshift --store /var/lib/nightshift/nightshift.sqlite cycle show --cycle-id '<cycle-id>'
+nightshift --store /var/lib/nightshift/nightshift.sqlite cycle show --slot-id 'sha256:<slot-digest>'
 nightshift --store /var/lib/nightshift/nightshift.sqlite cycle replay --cycle-id '<cycle-id>'
 ```
 
 Text output is presentation only. The durable cycle record retains exact
 support, diagnostic, posture, AG occurrence, attempt, and settlement
 references.
+
+`cycle show` requires exactly one cycle or slot identity and opens an existing
+store read-only. The slot selector uses the unique slot index and validates the
+same retained cycle record. It does not scan historical cycles or establish
+latest-family position, present support, completion, or authority. A claimed
+cycle with no observation is returned as such; an absent slot is an error.
 
 ## Restart and AG status
 

@@ -60,6 +60,8 @@ pub const TYPED_INTENT_SCHEMA_V2: &str = "nightshift.typed_coarse_intent.v2";
 pub const AG_REFERENCE_SCHEMA_V1: &str = "nightshift.ag_occurrence_reference.v1";
 pub const AG_REFUSAL_SCHEMA_V1: &str = "nightshift.ag_refusal_reference.v1";
 pub const PREPARED_AG_REQUEST_SCHEMA_V1: &str = "nightshift.prepared_ag_request.v1";
+const CYCLE_ID_FOR_SLOT_SQL: &str =
+    "SELECT cycle_id FROM canonical_observation_cycles WHERE slot_id=?1";
 
 fn require_token(name: &str, value: &str) -> Result<(), CanonicalStoreError> {
     if value.trim().is_empty() || value.chars().any(char::is_whitespace) {
@@ -129,6 +131,8 @@ pub enum CanonicalStoreError {
     Missed(String),
     #[error("observation cycle not found: {0}")]
     CycleNotFound(String),
+    #[error("observation cycle not found for recurrence slot: {0}")]
+    CycleNotFoundForSlot(String),
     #[error("stale predecessor digest")]
     StalePredecessor,
     #[error("illegal observation-cycle transition: {0}")]
@@ -2172,6 +2176,31 @@ impl CanonicalStore {
         Ok(cycle)
     }
 
+    /// Read the exact retained cycle for a deterministic slot identity through
+    /// the existing unique slot index, then apply the ordinary cycle validators.
+    /// This says nothing about which observation is the latest in its family.
+    pub fn get_cycle_for_slot(
+        &self,
+        slot_id: &str,
+    ) -> Result<ObservationCycleV1, CanonicalStoreError> {
+        require_digest("slot_id", slot_id)?;
+        let cycle_id: Option<String> = self
+            .connection
+            .query_row(CYCLE_ID_FOR_SLOT_SQL, [slot_id], |row| row.get(0))
+            .optional()?;
+        let id = ObservationCycleId::parse(
+            cycle_id
+                .ok_or_else(|| CanonicalStoreError::CycleNotFoundForSlot(slot_id.to_owned()))?,
+        )?;
+        let cycle = self.get_cycle(&id)?;
+        if cycle.cycle_id != id || cycle.slot.slot_id.as_str() != slot_id {
+            return Err(CanonicalStoreError::Invalid(
+                "indexed slot/cycle identity differs from retained cycle".into(),
+            ));
+        }
+        Ok(cycle)
+    }
+
     pub fn list_cycles(&self) -> Result<Vec<ObservationCycleV1>, CanonicalStoreError> {
         let mut statement = self.connection.prepare(
             "SELECT snapshot_json FROM canonical_observation_cycles ORDER BY updated_at, cycle_id",
@@ -3685,6 +3714,144 @@ mod tests {
         second.occurrence += 1;
         second.slot_id = RecurrenceSlotId(object_id(&second, "slot_id").unwrap());
         assert_ne!(first.slot_id, second.slot_id);
+    }
+
+    #[test]
+    fn get_cycle_for_slot_refuses_absent_invalid_and_substituted_slot() {
+        let mut store = CanonicalStore::open(":memory:").unwrap();
+        let first = slot(RecurrenceTriggerV1::Scheduled);
+        assert!(matches!(
+            store.get_cycle_for_slot(first.slot_id.as_str()),
+            Err(CanonicalStoreError::CycleNotFoundForSlot(_))
+        ));
+        assert!(matches!(
+            store.get_cycle_for_slot("not-a-digest"),
+            Err(CanonicalStoreError::Invalid(_))
+        ));
+        let (cycle, _) = store
+            .claim_slot(
+                first,
+                "nightshift-scheduler-1",
+                time("2026-08-11T12:00:00Z"),
+            )
+            .unwrap();
+        assert_eq!(
+            store
+                .get_cycle_for_slot(cycle.slot.slot_id.as_str())
+                .unwrap(),
+            cycle
+        );
+        assert!(cycle.observation.is_none());
+
+        let mut other = cycle.slot.clone();
+        other.occurrence += 1;
+        other.slot_id = RecurrenceSlotId(object_id(&other, "slot_id").unwrap());
+        store
+            .connection
+            .execute(
+                "UPDATE canonical_observation_cycles SET slot_id=?1 WHERE cycle_id=?2",
+                params![other.slot_id.as_str(), cycle.cycle_id.as_str()],
+            )
+            .unwrap_err();
+        // Retain an owning slot but remove its cycle to exercise a corrupt
+        // index-to-snapshot substitution without violating the FK on setup.
+        let (other_cycle, _) = store
+            .claim_slot(
+                other,
+                "nightshift-scheduler-1",
+                time("2026-08-11T12:00:00Z"),
+            )
+            .unwrap();
+        store
+            .connection
+            .execute(
+                "DELETE FROM canonical_cycle_events WHERE cycle_id=?1",
+                [other_cycle.cycle_id.as_str()],
+            )
+            .unwrap();
+        store
+            .connection
+            .execute(
+                "DELETE FROM canonical_observation_cycles WHERE cycle_id=?1",
+                [other_cycle.cycle_id.as_str()],
+            )
+            .unwrap();
+        store
+            .connection
+            .execute(
+                "UPDATE canonical_observation_cycles SET slot_id=?1 WHERE cycle_id=?2",
+                params![other_cycle.slot.slot_id.as_str(), cycle.cycle_id.as_str()],
+            )
+            .unwrap();
+        assert!(
+            matches!(store.get_cycle_for_slot(other_cycle.slot.slot_id.as_str()),
+            Err(CanonicalStoreError::Invalid(message)) if message.contains("indexed slot/cycle"))
+        );
+    }
+
+    #[test]
+    fn get_cycle_for_slot_cost_is_bounded_with_unrelated_history() {
+        use rusqlite::StatementStatus;
+        let mut store = CanonicalStore::open(":memory:").unwrap();
+        let (selected, _) = store
+            .claim_slot(
+                slot(RecurrenceTriggerV1::Scheduled),
+                "nightshift-scheduler-1",
+                time("2026-08-11T12:00:00Z"),
+            )
+            .unwrap();
+        let cost = |store: &CanonicalStore| {
+            let mut query = store.connection.prepare(CYCLE_ID_FOR_SLOT_SQL).unwrap();
+            let id: String = query
+                .query_row([selected.slot.slot_id.as_str()], |r| r.get(0))
+                .unwrap();
+            assert_eq!(id, selected.cycle_id.as_str());
+            assert_eq!(query.get_status(StatementStatus::FullscanStep), 0);
+            assert_eq!(query.get_status(StatementStatus::Sort), 0);
+            query.get_status(StatementStatus::VmStep)
+        };
+        let small = cost(&store);
+        let mut last = None;
+        for occurrence in 100..2100 {
+            let mut another = selected.slot.clone();
+            another.occurrence = occurrence;
+            another.slot_id = RecurrenceSlotId(object_id(&another, "slot_id").unwrap());
+            let (cycle, _) = store
+                .claim_slot(
+                    another,
+                    "nightshift-scheduler-1",
+                    time("2026-08-11T12:00:00Z"),
+                )
+                .unwrap();
+            last = Some(cycle.cycle_id);
+        }
+        let large = cost(&store);
+        assert!(
+            large <= small + 4 && large < 64,
+            "lookup VM steps: {small} -> {large}"
+        );
+        let plan: String = store
+            .connection
+            .query_row(
+                &format!("EXPLAIN QUERY PLAN {CYCLE_ID_FOR_SLOT_SQL}"),
+                [selected.slot.slot_id.as_str()],
+                |r| r.get(3),
+            )
+            .unwrap();
+        assert!(plan.contains("SEARCH") && !plan.contains("SCAN"), "{plan}");
+        store.connection.execute(
+            "UPDATE canonical_observation_cycles SET snapshot_json='unrelated-corrupt-history' WHERE cycle_id=?1",
+            [last.unwrap().as_str()]).unwrap();
+        assert!(store.list_cycles().is_err());
+        assert_eq!(
+            store
+                .get_cycle_for_slot(selected.slot.slot_id.as_str())
+                .unwrap(),
+            selected
+        );
+        eprintln!(
+            "slot lookup 1/2001 cycles: VM steps {small}/{large}; no fullscan or sort; {plan}"
+        );
     }
 
     #[test]
