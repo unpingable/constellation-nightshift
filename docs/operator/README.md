@@ -142,6 +142,14 @@ Text output is presentation only. The durable cycle record retains exact
 support, diagnostic, posture, AG occurrence, attempt, and settlement
 references.
 
+The first writer open of a store that predates the latest-cycle indexes builds
+two indexes over retained cycle history. This one-time migration takes time,
+disk space, and writer locking proportional to that history; later writes
+maintain the indexes. Only the three tested latest-cycle projections (newest
+cycle with `LIMIT 1`, and newest closed cycles with `LIMIT 1` or `LIMIT 16`)
+avoid scanning unrelated history. Store open and full-history operations are
+not generally constant-time. Read-only opens never create these indexes.
+
 ## Restart and AG status
 
 ```sh
