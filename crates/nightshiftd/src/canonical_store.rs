@@ -1608,7 +1608,11 @@ impl CanonicalStore {
         }
         connection.execute_batch(
             "CREATE INDEX IF NOT EXISTS canonical_cycles_observation_id
-             ON canonical_observation_cycles(observation_id)",
+             ON canonical_observation_cycles(observation_id);
+             CREATE INDEX IF NOT EXISTS canonical_cycles_latest_updated_at
+             ON canonical_observation_cycles(updated_at DESC);
+             CREATE INDEX IF NOT EXISTS canonical_closed_cycles_latest_updated_at
+             ON canonical_observation_cycles(updated_at DESC) WHERE status='closed'",
         )?;
         Ok(Self { connection })
     }
@@ -4586,6 +4590,275 @@ mod tests {
         assert_eq!(
             first_export.family,
             ObservationFamilyKeyV1::of_slot(&first.slot)
+        );
+    }
+
+    // Exact existing Monitor LIMIT16 and auxiliary-status LIMIT1 queries (#10).
+    // These are selection/cost fixtures, never live-currentness testimony.
+    const LATEST_PROJECTION_QUERIES: [(&str, usize); 3] = [
+        (
+            "SELECT cycle_id, updated_at FROM canonical_observation_cycles \
+             WHERE status = 'closed' ORDER BY updated_at DESC LIMIT 16",
+            16,
+        ),
+        (
+            "SELECT cycle_id, updated_at, snapshot_json FROM canonical_observation_cycles \
+             WHERE status='closed' ORDER BY updated_at DESC LIMIT 1",
+            1,
+        ),
+        (
+            "SELECT cycle_id, status, updated_at, snapshot_json \
+             FROM canonical_observation_cycles ORDER BY updated_at DESC LIMIT 1",
+            1,
+        ),
+    ];
+
+    fn projection_rows(connection: &Connection, sql: &str) -> Vec<Vec<rusqlite::types::Value>> {
+        let mut statement = connection.prepare(sql).unwrap();
+        let columns = statement.column_count();
+        let rows = statement
+            .query_map([], |row| {
+                (0..columns)
+                    .map(|column| row.get(column))
+                    .collect::<rusqlite::Result<Vec<rusqlite::types::Value>>>()
+            })
+            .unwrap();
+        rows.collect::<rusqlite::Result<Vec<_>>>().unwrap()
+    }
+
+    fn projection_retained_rows(store: &CanonicalStore) -> Vec<Vec<Vec<rusqlite::types::Value>>> {
+        [
+            "SELECT * FROM canonical_recurrence_slots ORDER BY slot_id",
+            "SELECT * FROM canonical_observation_cycles ORDER BY cycle_id",
+            "SELECT * FROM canonical_cycle_events ORDER BY cycle_id, sequence",
+        ]
+        .iter()
+        .map(|sql| projection_rows(&store.connection, sql))
+        .collect()
+    }
+
+    fn projection_index_definitions(store: &CanonicalStore) -> Vec<Vec<rusqlite::types::Value>> {
+        projection_rows(
+            &store.connection,
+            "SELECT name, sql FROM sqlite_master WHERE type='index' AND name IN \
+             ('canonical_cycles_latest_updated_at', 'canonical_closed_cycles_latest_updated_at') \
+             ORDER BY name",
+        )
+    }
+
+    fn claim_projection_slot(
+        store: &mut CanonicalStore,
+        occurrence: u64,
+        now: DateTime<Utc>,
+    ) -> (ObservationCycleV1, LiveCycleLeaseV1) {
+        let mut slot = example_slot(1);
+        slot.occurrence = occurrence;
+        slot.slot_id = RecurrenceSlotId(object_id(&slot, "slot_id").unwrap());
+        store
+            .claim_slot(slot, "nightshift-scheduler-1", now)
+            .unwrap()
+    }
+
+    fn projection_fixture(path: &Path) -> CanonicalStore {
+        let mut store = CanonicalStore::open(path).unwrap();
+        // More than LIMIT16 closed cycles deliberately tie on updated_at.
+        // Their random cycle IDs are not a newly invented SQL tie breaker.
+        for occurrence in 1..=24 {
+            let (cycle, lease) =
+                claim_projection_slot(&mut store, occurrence, time("2026-08-11T12:01:00Z"));
+            let observation = observation_for(&cycle.cycle_id, &digest('a'));
+            let attention = AttentionRecordV1 {
+                class: AttentionClassV1::Display,
+                source_posture_id: observation.posture.posture_id.clone(),
+                reason_code: "posture_observed".into(),
+                display_text: None,
+            };
+            let observed = store
+                .record_observation(
+                    &lease,
+                    &cycle.state_digest,
+                    observation,
+                    attention,
+                    None,
+                    time("2026-08-11T12:01:00Z"),
+                )
+                .unwrap();
+            store
+                .close_without_proposal(
+                    &lease,
+                    &observed.state_digest,
+                    time("2026-08-11T12:02:00Z"),
+                )
+                .unwrap();
+        }
+        for occurrence in 100..108 {
+            claim_projection_slot(&mut store, occurrence, time("2026-08-11T12:03:00Z"));
+        }
+        store
+    }
+
+    #[test]
+    fn latest_cycle_projection_queries_bound_retained_history() {
+        use rusqlite::StatementStatus;
+        let directory = tempfile::tempdir().unwrap();
+        let mut store = projection_fixture(&directory.path().join("projection.sqlite"));
+        let closed_before: Vec<_> = LATEST_PROJECTION_QUERIES[..2]
+            .iter()
+            .map(|(sql, _)| projection_rows(&store.connection, sql))
+            .collect();
+        let costs = |store: &CanonicalStore| {
+            LATEST_PROJECTION_QUERIES
+                .iter()
+                .map(|(sql, limit)| {
+                    let mut statement = store.connection.prepare(sql).unwrap();
+                    let rows = statement
+                        .query_map([], |row| row.get::<_, String>(0))
+                        .unwrap()
+                        .collect::<rusqlite::Result<Vec<_>>>()
+                        .unwrap();
+                    assert_eq!(rows.len(), *limit);
+                    assert_eq!(
+                        statement.get_status(StatementStatus::Sort),
+                        0,
+                        "latest projection still sorts retained history: {sql}"
+                    );
+                    assert!(
+                        statement.get_status(StatementStatus::FullscanStep) <= *limit as i32,
+                        "latest projection scans unrelated history: {sql}"
+                    );
+                    let steps = statement.get_status(StatementStatus::VmStep);
+                    assert!(steps < 400, "latest projection VM steps {steps}: {sql}");
+                    let plan =
+                        projection_rows(&store.connection, &format!("EXPLAIN QUERY PLAN {sql}"));
+                    let plan = format!("{plan:?}");
+                    assert!(
+                        plan.contains("USING INDEX") && !plan.contains("TEMP B-TREE"),
+                        "{plan}"
+                    );
+                    steps
+                })
+                .collect::<Vec<_>>()
+        };
+        let small = costs(&store);
+        let mut latest = None;
+        for occurrence in 1000..3000 {
+            latest =
+                Some(claim_projection_slot(&mut store, occurrence, time("2026-08-11T12:04:00Z")).0);
+        }
+        let large = costs(&store);
+        assert_eq!(small, large, "projection VM steps: {small:?} -> {large:?}");
+        for (index, (sql, _)) in LATEST_PROJECTION_QUERIES[..2].iter().enumerate() {
+            assert_eq!(
+                projection_rows(&store.connection, sql),
+                closed_before[index]
+            );
+        }
+        // All newer rows tie; preserve the actual existing SQL selection, not
+        // an assumption that the last inserted cycle wins an unspecified tie.
+        let latest = latest.unwrap();
+        assert_eq!(
+            store
+                .get_cycle_for_slot(latest.slot.slot_id.as_str())
+                .unwrap(),
+            latest
+        );
+        eprintln!("latest projection VM steps 32/2032 valid cycles: {small:?}/{large:?}");
+    }
+
+    #[test]
+    fn latest_cycle_projection_migration_preserves_rows_selection_and_read_only() {
+        let directory = tempfile::tempdir().unwrap();
+        let database = directory.path().join("projection.sqlite");
+        let store = projection_fixture(&database);
+        // Emulate a real pre-index store only in this disposable fixture.
+        store
+            .connection
+            .execute_batch(
+                "DROP INDEX IF EXISTS canonical_cycles_latest_updated_at;
+             DROP INDEX IF EXISTS canonical_closed_cycles_latest_updated_at",
+            )
+            .unwrap();
+        let rows_before = projection_retained_rows(&store);
+        let cycles_before = store.list_cycles().unwrap();
+        let selected_before: Vec<_> = LATEST_PROJECTION_QUERIES
+            .iter()
+            .map(|(sql, _)| projection_rows(&store.connection, sql))
+            .collect();
+        assert_eq!(selected_before[0].len(), 16);
+        assert_eq!(selected_before[1].len(), 1);
+        assert_eq!(
+            selected_before[2][0][1],
+            rusqlite::types::Value::Text("observing".into())
+        );
+        let schema_before = projection_rows(
+            &store.connection,
+            "SELECT type, name, sql FROM sqlite_master ORDER BY type, name",
+        );
+        drop(store);
+
+        let read_only = CanonicalStore::open_read_only(&database).unwrap();
+        assert!(projection_index_definitions(&read_only).is_empty());
+        assert_eq!(projection_retained_rows(&read_only), rows_before);
+        assert!(read_only
+            .connection
+            .execute_batch(
+                "CREATE INDEX forbidden_reader_index ON canonical_observation_cycles(status)",
+            )
+            .is_err());
+        assert_eq!(
+            projection_rows(
+                &read_only.connection,
+                "SELECT type, name, sql FROM sqlite_master ORDER BY type, name"
+            ),
+            schema_before
+        );
+        drop(read_only);
+
+        let migrated = CanonicalStore::open(&database).unwrap();
+        let indexes = projection_index_definitions(&migrated);
+        assert_eq!(
+            indexes.len(),
+            2,
+            "writer open must install both projection indexes"
+        );
+        assert_eq!(projection_retained_rows(&migrated), rows_before);
+        for (index, (sql, _)) in LATEST_PROJECTION_QUERIES.iter().enumerate() {
+            assert_eq!(
+                projection_rows(&migrated.connection, sql),
+                selected_before[index]
+            );
+        }
+        for cycle in &cycles_before {
+            assert_eq!(migrated.get_cycle(&cycle.cycle_id).unwrap(), *cycle);
+            assert_eq!(
+                migrated
+                    .get_cycle_for_slot(cycle.slot.slot_id.as_str())
+                    .unwrap(),
+                *cycle
+            );
+            assert_eq!(
+                migrated.replay(&cycle.cycle_id).unwrap().last(),
+                Some(cycle)
+            );
+        }
+        drop(migrated);
+        let reopened = CanonicalStore::open(&database).unwrap();
+        assert_eq!(projection_index_definitions(&reopened), indexes);
+        assert_eq!(projection_retained_rows(&reopened), rows_before);
+        let schema_after = projection_rows(
+            &reopened.connection,
+            "SELECT type, name, sql FROM sqlite_master ORDER BY type, name",
+        );
+        drop(reopened);
+        let read_only = CanonicalStore::open_read_only(&database).unwrap();
+        assert_eq!(projection_index_definitions(&read_only), indexes);
+        assert_eq!(projection_retained_rows(&read_only), rows_before);
+        assert_eq!(
+            projection_rows(
+                &read_only.connection,
+                "SELECT type, name, sql FROM sqlite_master ORDER BY type, name"
+            ),
+            schema_after
         );
     }
 
