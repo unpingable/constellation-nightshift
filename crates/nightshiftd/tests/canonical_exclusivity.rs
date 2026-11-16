@@ -130,7 +130,7 @@ fn retired_authority_stack_is_structurally_absent_from_production() {
 }
 
 #[test]
-fn only_closed_upstream_verifiers_present_support_and_ag_are_process_boundaries() {
+fn only_closed_process_boundaries_include_enrolled_saved_check_acquisition_and_evaluation() {
     let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut command_files = Vec::new();
     fn visit(directory: &Path, command_files: &mut Vec<String>) {
@@ -160,7 +160,10 @@ fn only_closed_upstream_verifiers_present_support_and_ag_are_process_boundaries(
             "nq_admission.rs",
             "project_predicate_attention.rs",
             "repository_qualification.rs",
-            "reservation_qualification.rs"
+            "reservation_qualification.rs",
+            // Separately enrolled acquisition/evaluation, not read-only replay.
+            // The owning structural gate checks its exact role/argv and bounds.
+            "saved_check_runtime.rs"
         ]
     );
 
