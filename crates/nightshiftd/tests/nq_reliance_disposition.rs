@@ -40,8 +40,11 @@ fn receipt_json(decision: &str, underlying: &str) -> serde_json::Value {
 }
 
 fn parse(v: &serde_json::Value) -> NqRelianceReceiptDto {
-    NqRelianceReceiptDto::parse_historical_checked(&serde_json::to_vec(v).unwrap(), EXPECTED_CONSUMER_PROFILE)
-        .expect("valid receipt")
+    NqRelianceReceiptDto::parse_historical_checked(
+        &serde_json::to_vec(v).unwrap(),
+        EXPECTED_CONSUMER_PROFILE,
+    )
+    .expect("valid receipt")
 }
 
 fn disposition_for(decision: &str, underlying: &str) -> Disposition {
@@ -216,7 +219,11 @@ fn transport_unavailable_is_also_night_shifts_observation() {
 // 9. malformed JSON refuses at the contract boundary
 #[test]
 fn malformed_and_wrong_schema_receipts_are_refused_before_disposition() {
-    assert!(NqRelianceReceiptDto::parse_historical_checked(b"{not json", EXPECTED_CONSUMER_PROFILE).is_err());
+    assert!(NqRelianceReceiptDto::parse_historical_checked(
+        b"{not json",
+        EXPECTED_CONSUMER_PROFILE
+    )
+    .is_err());
 
     let mut wrong = receipt_json("authorized_reliance", "verified");
     wrong["schema"] = serde_json::json!("nq.reliance.receipt.v99");

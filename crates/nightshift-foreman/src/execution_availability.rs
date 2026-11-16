@@ -61,8 +61,7 @@ const BOUNDED_TURN_SWITCHYARD_OWNER_HEAD: &str = "8479cb77dc76632e64b66e84c4f75c
 // Candidate only; finalized from the independently frozen Switchyard successor.
 const BOUNDED_TURN_ECHO_SWITCHYARD_OWNER_HEAD: &str = "805e84d777eaab57c2108919ce43b09828e6e1ef";
 // Explicit raw-completion/runtime-preflight successor; old tuples remain replayable.
-const RAW_COMPLETION_ECHO_SWITCHYARD_OWNER_HEAD: &str =
-    "df9acbd044beaa4cb165dcb648341cc373aecd72";
+const RAW_COMPLETION_ECHO_SWITCHYARD_OWNER_HEAD: &str = "df9acbd044beaa4cb165dcb648341cc373aecd72";
 const FILTERED_RAW_COMPLETION_ECHO_SWITCHYARD_OWNER_HEAD: &str =
     "299609cda100ccf8701d5619ac78499f8bddd303";
 // Exact read-only terminal-receipt projection successor; prior tuples remain replayable.

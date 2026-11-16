@@ -67,7 +67,17 @@ fn three_observatories_traverse_existing_project_predicate_path() {
     ];
 
     for (index, case) in cases.iter().enumerate() {
-        run_case(index as u8 + 31, case, &cohort, &monitor, &nq, &pulse, &catalog_path, &catalog, &catalog_digest);
+        run_case(
+            index as u8 + 31,
+            case,
+            &cohort,
+            &monitor,
+            &nq,
+            &pulse,
+            &catalog_path,
+            &catalog,
+            &catalog_digest,
+        );
     }
 }
 
@@ -89,7 +99,11 @@ fn run_case(
     let state = root.path().join("state");
     fs::create_dir_all(fixture.join(".ops")).unwrap();
     fs::create_dir_all(&state).unwrap();
-    fs::copy(source.join(".ops/concerns.toml"), fixture.join(".ops/concerns.toml")).unwrap();
+    fs::copy(
+        source.join(".ops/concerns.toml"),
+        fixture.join(".ops/concerns.toml"),
+    )
+    .unwrap();
 
     if let Some(demo) = case.demo {
         let output = Command::new("python3")
@@ -103,7 +117,10 @@ fn run_case(
         assert_success(&format!("{} demo", case.project), &output);
     } else {
         let output = Command::new("python3")
-            .args(["-c", "import sqlite3,sys; sqlite3.connect(sys.argv[1]).close()"])
+            .args([
+                "-c",
+                "import sqlite3,sys; sqlite3.connect(sys.argv[1]).close()",
+            ])
             .arg(state.join(case.db_name))
             .output()
             .unwrap();
@@ -161,7 +178,9 @@ fn run_case(
     assert_eq!(item["observation"]["local_state"], "PRESENT");
     let observed_at = item["observation"]["observed_at"].as_str().unwrap();
     let facts = item["observation"]["facts"].clone();
-    let manifest_digest = inventory["acquisition"]["manifest_digest"].as_str().unwrap();
+    let manifest_digest = inventory["acquisition"]["manifest_digest"]
+        .as_str()
+        .unwrap();
     let declaration_question = item["declaration"]["question"].as_str().unwrap();
 
     let profile = catalog["profiles"]
@@ -174,7 +193,11 @@ fn run_case(
                 && profile["question"] == declaration_question
         })
         .unwrap();
-    assert!(profile["accepted_manifest_digests"].as_array().unwrap().iter().any(|v| v == manifest_digest));
+    assert!(profile["accepted_manifest_digests"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v == manifest_digest));
     let profile_digest = digest(profile);
     let input_schema_digest = digest(&profile["input_schema"]);
     let nq_receipt = root.path().join("nq.json");
@@ -183,7 +206,15 @@ fn run_case(
         .arg(&inventory_path)
         .arg("--profiles")
         .arg(catalog_path)
-        .args(["--catalog-digest", catalog_digest, "--concern", case.concern, "--evaluated-at", observed_at, "--output"])
+        .args([
+            "--catalog-digest",
+            catalog_digest,
+            "--concern",
+            case.concern,
+            "--evaluated-at",
+            observed_at,
+            "--output",
+        ])
         .arg(&nq_receipt)
         .output()
         .unwrap();
@@ -268,14 +299,22 @@ fn run_case(
     let pulse_receipt = root.path().join("pulse.json");
     let qualified = Command::new(pulse)
         .arg("qualify")
-        .arg("--policy").arg(&pulse_policy_path)
-        .arg("--nq-executable").arg(nq)
-        .arg("--nq-receipt").arg(&nq_receipt)
-        .arg("--inventory").arg(&inventory_path)
-        .arg("--catalog").arg(catalog_path)
-        .arg("--support-evidence").arg(&evidence_path)
-        .args(["--at", observed_at, "--output"]).arg(&pulse_receipt)
-        .output().unwrap();
+        .arg("--policy")
+        .arg(&pulse_policy_path)
+        .arg("--nq-executable")
+        .arg(nq)
+        .arg("--nq-receipt")
+        .arg(&nq_receipt)
+        .arg("--inventory")
+        .arg(&inventory_path)
+        .arg("--catalog")
+        .arg(catalog_path)
+        .arg("--support-evidence")
+        .arg(&evidence_path)
+        .args(["--at", observed_at, "--output"])
+        .arg(&pulse_receipt)
+        .output()
+        .unwrap();
     assert_success(&format!("{} Pulse qualification", case.project), &qualified);
 
     let mut attention_policy = AttentionPolicyV1 {
@@ -297,7 +336,10 @@ fn run_case(
         },
         pulse_verifier_executable_digest: executable_digest(pulse).unwrap(),
         trigger: AttentionTriggerV1::PropositionAttention,
-        recurrence: RecurrencePolicyV1 { required_distinct_occurrences: 1, within_seconds: 600 },
+        recurrence: RecurrencePolicyV1 {
+            required_distinct_occurrences: 1,
+            within_seconds: 600,
+        },
         reset: ResetPolicyV1::HorizonExpiry,
     };
     attention_policy.seal().unwrap();
@@ -313,26 +355,51 @@ fn run_case(
             catalog: catalog_path.into(),
             support_evidence: Some(evidence_path),
         },
-    ).unwrap();
+    )
+    .unwrap();
     let mut store = AttentionStoreV1::open(&root.path().join("nightshift.sqlite")).unwrap();
-    assert_eq!(store.ingest_verified(&attention_policy, verified).unwrap().disposition, IngestDispositionV1::Accepted);
+    assert_eq!(
+        store
+            .ingest_verified(&attention_policy, verified)
+            .unwrap()
+            .disposition,
+        IngestDispositionV1::Accepted
+    );
     let result = evaluate(
         &attention_policy,
         &store.history(&attention_policy).unwrap(),
-        chrono::DateTime::parse_from_rfc3339(observed_at).unwrap().to_utc(),
-    ).unwrap();
-    assert_eq!(result.receipt.disposition, AttentionDispositionV1::AttentionRequired);
+        chrono::DateTime::parse_from_rfc3339(observed_at)
+            .unwrap()
+            .to_utc(),
+    )
+    .unwrap();
+    assert_eq!(
+        result.receipt.disposition,
+        AttentionDispositionV1::AttentionRequired
+    );
 }
 
 fn required(name: &str) -> std::ffi::OsString {
     std::env::var_os(name).unwrap_or_else(|| panic!("{name} is required"))
 }
 fn assert_success(label: &str, output: &Output) {
-    assert!(output.status.success(), "{label}: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{label}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
-fn canonical(value: &impl Serialize) -> Vec<u8> { serde_jcs::to_vec(value).unwrap() }
-fn digest(value: &impl Serialize) -> String { format!("sha256:{:x}", Sha256::digest(canonical(value))) }
+fn canonical(value: &impl Serialize) -> Vec<u8> {
+    serde_jcs::to_vec(value).unwrap()
+}
+fn digest(value: &impl Serialize) -> String {
+    format!("sha256:{:x}", Sha256::digest(canonical(value)))
+}
 fn digest_without(value: &Value, field: &str) -> String {
-    let mut value=value.clone(); value.as_object_mut().unwrap().remove(field); digest(&value)
+    let mut value = value.clone();
+    value.as_object_mut().unwrap().remove(field);
+    digest(&value)
 }
-fn hex(bytes: &[u8]) -> String { bytes.iter().map(|byte| format!("{byte:02x}")).collect() }
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}

@@ -123,9 +123,7 @@ fn bounded_turn_echo_cross_language_vector_is_exact() {
         .collect();
     assert_eq!(
         sizes,
-        [
-            118500, 53, 118606, 118610, 249, 282, 155, 240, 196756, 196852, 196959
-        ]
+        [118500, 53, 118606, 118610, 249, 282, 155, 240, 196756, 196852, 196959]
     );
     assert_eq!(
         wire(&snapshot["records"][9])["params"]["item"]["text"]

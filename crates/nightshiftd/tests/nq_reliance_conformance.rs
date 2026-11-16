@@ -108,7 +108,8 @@ fn no_accepted_vector_yields_an_action_or_capability() {
     let fx = fixtures();
     for name in expected_for_this_consumer().keys() {
         let dto =
-            NqRelianceReceiptDto::parse_historical_checked(&fx[*name], EXPECTED_CONSUMER_PROFILE).unwrap();
+            NqRelianceReceiptDto::parse_historical_checked(&fx[*name], EXPECTED_CONSUMER_PROFILE)
+                .unwrap();
         let rec = derive_disposition(
             &SourceState::Fresh,
             Some(&dto),
@@ -141,7 +142,8 @@ fn carried_facts_survive_every_accepted_vector() {
         let raw: serde_json::Value = serde_json::from_slice(&fx[name]).unwrap();
         let source_len = raw[field].as_array().map_or(0, Vec::len);
         let dto =
-            NqRelianceReceiptDto::parse_historical_checked(&fx[name], EXPECTED_CONSUMER_PROFILE).unwrap();
+            NqRelianceReceiptDto::parse_historical_checked(&fx[name], EXPECTED_CONSUMER_PROFILE)
+                .unwrap();
         let rec = derive_disposition(
             &SourceState::Fresh,
             Some(&dto),
@@ -240,9 +242,10 @@ fn continuity_vectors_map_to_the_expected_posture_under_the_continuity_expectati
 fn continuity_vectors_refuse_under_the_base_expectation() {
     let fx = fixtures();
     for name in expected_for_continuity_consumer().keys() {
-        let err = NqRelianceReceiptDto::parse_historical_checked(&fx[*name], EXPECTED_CONSUMER_PROFILE)
-            .err()
-            .unwrap_or_else(|| panic!("{name} is not addressed to the base consumer"));
+        let err =
+            NqRelianceReceiptDto::parse_historical_checked(&fx[*name], EXPECTED_CONSUMER_PROFILE)
+                .err()
+                .unwrap_or_else(|| panic!("{name} is not addressed to the base consumer"));
         assert!(
             err.to_string().contains("consumer"),
             "{name}: refusal must name the consumer mismatch, got {err}"
@@ -316,9 +319,11 @@ fn missing_support_refusal_stays_disclosure_free_and_distinct_from_no_response()
     // The missing-support refusal binds nothing; its source binding must not
     // grow a supporting_receipts key (absent-when-empty, byte-compatible).
     let fx = fixtures();
-    let dto =
-        NqRelianceReceiptDto::parse_historical_checked(&fx["continuity_support_missing"], CONTINUITY_CONSUMER)
-            .unwrap();
+    let dto = NqRelianceReceiptDto::parse_historical_checked(
+        &fx["continuity_support_missing"],
+        CONTINUITY_CONSUMER,
+    )
+    .unwrap();
     let rec = derive_disposition(&SourceState::Fresh, Some(&dto), NOW, CONTINUITY_CONSUMER);
     let json = serde_json::to_value(&rec).unwrap();
     assert!(json["source"].get("supporting_receipts").is_none());
