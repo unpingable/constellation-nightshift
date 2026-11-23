@@ -457,6 +457,11 @@ enum CycleCommand {
         maude_session_id: Option<String>,
     },
     List,
+    /// Read bounded recurrence telemetry from retained cycle fields.
+    Summary {
+        #[arg(long, value_enum, default_value_t = CycleSummaryFormat::Json)]
+        format: CycleSummaryFormat,
+    },
     Replay {
         #[arg(long)]
         cycle_id: String,
@@ -556,6 +561,12 @@ struct CycleRunArguments {
 enum OutputFormat {
     Json,
     Text,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum CycleSummaryFormat {
+    Json,
+    Textfile,
 }
 
 struct NoAgPort;
@@ -1372,6 +1383,16 @@ fn run_cycle_command(store_path: &Path, command: CycleCommand) -> anyhow::Result
             }
         }
         CycleCommand::List => write_exact(&CanonicalStore::open(store_path)?.list_cycles()?),
+        CycleCommand::Summary { format } => {
+            let store = CanonicalStore::open_read_only(store_path)?;
+            let summary = store.cycle_summary()?;
+            match format {
+                CycleSummaryFormat::Json => write_exact(&summary),
+                CycleSummaryFormat::Textfile => Ok(std::io::stdout()
+                    .lock()
+                    .write_all(summary.textfile().as_bytes())?),
+            }
+        }
         CycleCommand::ExportObservation { observation_id } => {
             let store = CanonicalStore::open(store_path)?;
             write_exact(

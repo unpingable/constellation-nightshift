@@ -245,6 +245,47 @@ fn export_observation_reports_absent_as_zero_matches() {
 }
 
 #[test]
+fn cycle_summary_projects_closed_cycle_and_admitted_source_time() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("ns.sqlite");
+    let mut store = CanonicalStore::open(&database).unwrap();
+    let mut support = CurrentSupportPort;
+    let mut ag = NoAgPort;
+    let outcome = CanonicalRuntime::new(&mut store, TestNqAdmissionPort, &mut support, &mut ag)
+        .run_cycle(posture_only_request(&digest('a')))
+        .unwrap();
+    let CycleRunOutcomeV1::PostureOnly { cycle } = outcome else {
+        panic!("expected a posture-only cycle")
+    };
+    drop(store);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_nightshift"))
+        .arg("--store")
+        .arg(&database)
+        .args(["cycle", "summary"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let summary: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let latest = &summary["latest_cycle"];
+    assert_eq!(latest["status"], "closed");
+    assert_eq!(latest["timing"], "late");
+    assert_eq!(summary["last_closed_cycle_updated_at"], cycle.updated_at);
+    let cycle = serde_json::to_value(cycle).unwrap();
+    assert_eq!(
+        latest["oldest_nq_admission_completed_at"],
+        cycle["observation"]["source_admissions"][0]["origin"]["completed_at"]
+    );
+    assert!(!summary
+        .to_string()
+        .contains(cycle["cycle_id"].as_str().unwrap()));
+}
+
+#[test]
 fn export_observation_does_not_mutate_runtime_state() {
     let directory = tempfile::tempdir().unwrap();
     let database = directory.path().join("ns.sqlite");

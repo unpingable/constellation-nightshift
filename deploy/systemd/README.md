@@ -48,6 +48,66 @@ files when present), without granting NQ mutation rights. The configured
 `NIGHTSHIFT_NQ_SOURCE_ID`, not either path, is the source identity checked at
 the boundary.
 
+## Publish recurrence telemetry
+
+`nightshift --store /var/lib/nightshift/nightshift.sqlite cycle summary`
+prints `nightshift.cycle_summary.v1` JSON. It reports the latest retained
+cycle update across the store, the latest recorded update of a closed cycle,
+and the time of the read. The latest cycle includes its status, slot timing and
+oldest completion time among its admitted NQ reports. A store with no cycles
+reports `latest_cycle: null`. An acquisition failure exits nonzero. The read
+requires the two latest-cycle indexes installed by the normal Nightshift
+writer. Open older stores through the normal writer before enabling export.
+
+With `--format textfile`, the same command emits these Prometheus gauges:
+
+| Gauge | Meaning |
+|---|---|
+| `constellation_nightshift_cycle_summary_observed_timestamp_seconds` | Time of the successful read |
+| `constellation_nightshift_cycle_present` | 1 when the store contains a cycle, otherwise 0 |
+| `constellation_nightshift_latest_cycle{status,timing}` | One sample with the latest cycle's closed status and timing labels |
+| `constellation_nightshift_latest_cycle_updated_timestamp_seconds` | The latest cycle's recorded `updated_at` |
+| `constellation_nightshift_last_closed_cycle_timestamp_seconds` | The most recent recorded `updated_at` of a closed cycle |
+| `constellation_nightshift_oldest_nq_admission_completed_timestamp_seconds` | Oldest completion time among the latest cycle's admitted NQ reports |
+
+An absent value omits its gauge. Unknown status and timing values use `other`.
+When cycles share the same update timestamp the store supplies one of them.
+Cycle timestamps describe recorded transitions, and NQ timestamps describe
+retained upstream completions. Use the read timestamp and the expected
+publication cadence to detect a missing or stale export. History counters,
+wall-clock run durations, and Foreman metrics are outside this projection.
+
+Run this example as the Nightshift service account in the site's existing
+scheduled export job. Create the destination directories with write access for
+the job and read access for the designated readers. Use the textfile directory
+configured in node_exporter.
+
+```sh
+#!/bin/sh
+set -eu
+publish() {
+    destination=$1
+    format=$2
+    temporary=$(mktemp "${destination}.tmp.XXXXXX")
+    trap 'rm -f -- "$temporary"' EXIT
+    /usr/bin/nightshift --store /var/lib/nightshift/nightshift.sqlite \
+        cycle summary --format "$format" > "$temporary"
+    chmod 0644 "$temporary"
+    mv -fT -- "$temporary" "$destination"
+    trap - EXIT
+}
+publish /var/lib/nightshift/cycle-summary.json json
+publish /var/lib/node_exporter/textfile_collector/nightshift.prom textfile
+```
+
+Each file is replaced by a rename in its destination directory. A failed read
+leaves the preceding file readable with its original timestamp. JSON and
+textfile exports each take a separate store snapshot, so their sampling times
+can differ. Run a single scheduled publisher per destination. If a site
+uses `ExecStartPost` on the existing observation unit, arrange the specific
+writable paths and allow for its runtime within the start timeout. A scrape
+reads published bytes only. This projection is for operator telemetry.
+
 ## Optional Maude authoring custody
 
 The reference timer remains suitable for cycles with no Maude authoring

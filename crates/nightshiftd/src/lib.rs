@@ -17,6 +17,7 @@ pub mod canonical_runtime;
 pub mod canonical_store;
 pub mod continuity_authority;
 pub mod currentness;
+pub mod cycle_summary;
 pub mod decision_basis;
 pub mod diagnostic_execution_v2;
 pub mod diagnostic_posture;

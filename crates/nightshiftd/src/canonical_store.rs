@@ -355,7 +355,7 @@ pub enum CycleStatusV1 {
 }
 
 impl CycleStatusV1 {
-    fn as_db(self) -> &'static str {
+    pub(crate) fn as_db(self) -> &'static str {
         match self {
             Self::Observing => "observing",
             Self::PostureRecorded => "posture_recorded",
@@ -2174,6 +2174,13 @@ impl CanonicalStore {
         self.validate_authoring_context_claim(&cycle)?;
         self.validate_authoring_custody_claim(&cycle)?;
         Ok(cycle)
+    }
+
+    /// Compact operator telemetry from one read snapshot of the indexed store.
+    pub fn cycle_summary(
+        &self,
+    ) -> Result<crate::cycle_summary::CycleSummaryV1, CanonicalStoreError> {
+        crate::cycle_summary::read(&self.connection)
     }
 
     pub fn list_cycles(&self) -> Result<Vec<ObservationCycleV1>, CanonicalStoreError> {
