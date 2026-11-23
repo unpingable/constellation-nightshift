@@ -4589,12 +4589,7 @@ mod tests {
         // All newer rows tie; preserve the actual existing SQL selection, not
         // an assumption that the last inserted cycle wins an unspecified tie.
         let latest = latest.unwrap();
-        assert_eq!(
-            store
-                .get_cycle_for_slot(latest.slot.slot_id.as_str())
-                .unwrap(),
-            latest
-        );
+        assert_eq!(store.get_cycle(&latest.cycle_id).unwrap(), latest);
         eprintln!("latest projection VM steps 32/2032 valid cycles: {small:?}/{large:?}");
     }
 
@@ -4663,12 +4658,6 @@ mod tests {
         }
         for cycle in &cycles_before {
             assert_eq!(migrated.get_cycle(&cycle.cycle_id).unwrap(), *cycle);
-            assert_eq!(
-                migrated
-                    .get_cycle_for_slot(cycle.slot.slot_id.as_str())
-                    .unwrap(),
-                *cycle
-            );
             assert_eq!(
                 migrated.replay(&cycle.cycle_id).unwrap().last(),
                 Some(cycle)
