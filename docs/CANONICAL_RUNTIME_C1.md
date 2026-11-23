@@ -556,6 +556,56 @@ An AG settlement records only attempt-native facts and moves the Nightshift
 cycle to `ObservationRequired`. Subject posture can change only after a new
 qualified observation and NQ evaluation.
 
+## Recurrence deployment and read access
+
+Keep one scheduler for each enrolled observation obligation. The site owns
+the cadence, clock, request generator, and input locators. When a wake
+warrants an attempt, the site supplies a sealed request for the selected
+slot. Its generator owns creation and rotation of the file that the packaged
+service reads at `NIGHTSHIFT_CYCLE_REQUEST`. See
+[the reference units](../deploy/systemd/README.md) for the service account and
+required filesystem access.
+
+Align a site-managed calendar to the request policy's epoch and cadence. For
+example, a policy with a 300-second cadence and an epoch at
+`2026-10-01T00:00:00Z` uses the UTC calendar below. Validate the effective
+timer definition before enabling it. Leave room in `latest_admissible` for
+systemd dispatch and request-generation delay. A timer wake does not extend
+that deadline and cannot substitute for the NQ acquisition timestamp or
+observer currentness.
+
+```sh
+systemctl cat nightshift-observation-cycle.timer
+systemd-analyze calendar --iterations=3 '*-*-* *:00/5:00 UTC'
+```
+
+Before nominal due time the runtime refuses the slot. After its latest
+admissible instant it records a `Missed` cycle without an observation.
+Inspect any authoritative attempt already recorded for the same slot before
+requesting another cycle. The durable slot claim excludes a second attempt.
+After restart, keep the original cycle ID and retain the original observation
+and source coordinates. Recovery uses the recorded cycle and, when present,
+the exact prepared AG occurrence. A later observation needs its own slot,
+admitted source evidence and present-support result.
+
+For operators with writer-store access, the following command inspects one
+retained cycle without running acquisition or calling AG:
+
+```sh
+nightshift --store /var/lib/nightshift/nightshift.sqlite \
+  cycle show --cycle-id '<exact retained cycle ID>'
+```
+
+`cycle show`, `cycle list`, `cycle replay`, and `cycle export-observation`
+use the normal store opener. It can create or migrate SQLite state and use
+WAL sidecars. Keep those commands with the runtime owner or run them on a
+separate consistent snapshot. The AG-facing `nightshift-observation-resolver`
+opens the existing compatible store in SQLite read-only mode. It refuses an
+older store lacking the required observation identity projection. Restrict
+access to the database and any SQLite sidecars needed by that deployment.
+Confirm the enrolled store path exists before using the inspection commands.
+Report a missing or unreadable store as unavailable.
+
 ## Current command surface
 
 ```sh

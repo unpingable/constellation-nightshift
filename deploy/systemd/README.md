@@ -6,7 +6,7 @@ its exact `cycle run` interface:
 | File | Role |
 |---|---|
 | `nightshift-observation-cycle.service` | one exact canonical observation cycle |
-| `nightshift-observation-cycle.timer` | preserved five-minute wake cadence, boot delay, jitter, and `Persistent=true` catch-up |
+| `nightshift-observation-cycle.timer` | boot-relative initial wake, five-minute activation-relative interval, and jitter |
 | `observation-cycle.env.example` | site-owned store, request, NQ-NG source, present-support resolver, and optional AG paths/profile |
 
 The timer grants permission only to attempt observation. Exact recurrence-slot
@@ -16,6 +16,11 @@ claims a slot; present support is resolved separately by its evidence
 authority, and any immutable exact-work proposal goes only to AG. Admission is
 not authorization. The unit has no Governor, Wicket, WLP, Docket, or executor
 option.
+
+The timer in this source uses monotonic triggers. `Persistent=true` catches
+up only calendar timers. Use the
+[recurrence deployment contract](../../docs/CANONICAL_RUNTIME_C1.md#recurrence-deployment-and-read-access)
+to align site timing with the request policy and recover retained cycles.
 
 The service first requires the configured program to support NQ-NG's global
 `--help`, then preflights the exact `diagnostics qualify` CLI surface before

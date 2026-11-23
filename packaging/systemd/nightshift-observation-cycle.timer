@@ -2,9 +2,8 @@
 Description=Nightshift canonical observation-cycle timer
 
 [Timer]
-# Preserve the existing invocation cadence, boot delay, jitter, and catch-up
-# policy. Slot identity and overlap exclusion are enforced by Nightshift's
-# canonical transactional store; diagnostic generation is irrelevant.
+# Boot and prior activation determine wake times. Nightshift's canonical
+# store excludes duplicate claims of the same slot.
 OnBootSec=2min
 OnUnitActiveSec=5min
 RandomizedDelaySec=30s

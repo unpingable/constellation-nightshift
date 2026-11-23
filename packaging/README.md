@@ -19,6 +19,10 @@ Inspect the timer/service journal and native cycle/status records. Incomplete
 support remains incomplete; recurrence never renews evidence or authority. Stop
 the timer and service before upgrades/removal and preserve their state.
 
+See the [recurrence deployment contract](https://github.com/unpingable/constellation-nightshift/blob/dev/operator-beta/docs/CANONICAL_RUNTIME_C1.md#recurrence-deployment-and-read-access)
+for site cadence, request rotation, retained cycle inspection, and the
+observation resolver's read-only store boundary.
+
 
 ## Executable build identity
 
